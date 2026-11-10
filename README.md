@@ -30,11 +30,51 @@ webterm depends on [node-pty](https://github.com/microsoft/node-pty), which has 
 
 Requires Node.js 20.12 or newer.
 
+## Running as a service (Linux)
+
+To keep webterm running in the background, start it at boot and restart it if it crashes, install it as a systemd **user** service. It runs as you, with no root needed:
+
+```sh
+npm install -g @quincyyhuang/webterm      # a stable install path (not the npx cache)
+cd ~/webterm                              # optional: a directory with your .env
+webterm install-service --host 0.0.0.0 --port 2828
+```
+
+From a clone of this repository, use `npm run install-service -- --host 0.0.0.0` instead.
+
+- **Options:** server options you pass (`--host`, `--port`, `--config`, ...) are saved in the service. The service runs in the current directory, so a `.env` file there is used too. The shell is pinned to your current one.
+- **Before installing,** credentials are checked, so a broken setup fails right away instead of looping.
+- **Lingering** is enabled if possible, so the service starts at boot and keeps running after you log out. See [Lingering](#lingering-keep-it-running-when-youre-logged-out) below.
+- **If the address isn't ready** (for example, at boot, before DHCP), the service retries every 5 seconds.
+- **Preview:** `--dry-run` prints the unit file without installing anything. `--name` picks a different unit name, so you can run several instances.
+
+```sh
+systemctl --user status webterm       # state
+journalctl --user -u webterm -f       # logs
+systemctl --user restart webterm      # after changing credentials, .env, or upgrading
+webterm uninstall-service             # stop and remove it
+```
+
+Running `install-service` again updates the existing service.
+
+### Lingering: keep it running when you're logged out
+
+systemd normally starts a user's services when they log in and stops them when they log out. To have webterm start at boot and keep running while you're logged out, **lingering** must be enabled for your user. `install-service` tries to turn it on for you, but some systems require admin rights. Check it and enable it yourself with:
+
+```sh
+loginctl show-user "$USER" -p Linger    # Linger=yes means it's on
+sudo loginctl enable-linger "$USER"     # turn it on
+```
+
+Without lingering, webterm only runs while you have a login session open (a desktop session or an SSH connection), and stops when the last one ends. To undo it, run `sudo loginctl disable-linger "$USER"`. That also stops your other user services from running while you're logged out.
+
 ## Usage
 
 ```
 webterm [options]                         start the server
 webterm set-password <username> [--print] create credentials
+webterm install-service [options]         run as a systemd user service
+webterm uninstall-service [--name <n>]    stop and remove that service
 
 -H, --host <addr>     address to bind      (env WEBTERM_HOST, default 127.0.0.1)
 -p, --port <port>     port to listen on    (env WEBTERM_PORT, default 2828)

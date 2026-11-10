@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseArgs } from 'node:util';
+import { fileURLToPath } from 'node:url';
 
 const { version } = createRequire(import.meta.url)('../package.json');
 
@@ -12,6 +13,9 @@ const HELP = `webterm ${version}: a terminal in your browser
 Usage:
   webterm [options]                         start the server
   webterm set-password <username> [--print] create credentials
+  webterm install-service [options]         run webterm as a systemd user service
+                                            (starts at boot, restarts on failure)
+  webterm uninstall-service [--name <n>]    stop and remove that service
 
 Options:
   -H, --host <addr>     address to bind      (env WEBTERM_HOST, default 127.0.0.1)
@@ -26,12 +30,17 @@ Options:
                                               (env WEBTERM_SHELL_TIMEOUT_HOURS,
                                               default 168 = 7 days; 0 = never)
       --print           set-password: print env vars instead of writing the file
+      --name <name>     install/uninstall-service: unit name (default webterm)
+      --dry-run         install-service: print the unit file instead of installing
   -h, --help            show this help
   -v, --version         show the version
 
 Credentials come from WEBTERM_USER + WEBTERM_PASSWORD_HASH if both are set,
 otherwise from the config file. A .env file in the current directory is
 loaded automatically.
+
+install-service passes the server options you give it on to the service, and
+runs it in the current directory, so a .env file there is used too.
 `;
 
 function fail(message) {
@@ -51,6 +60,8 @@ try {
       'max-upload': { type: 'string' },
       'shell-timeout': { type: 'string' },
       print: { type: 'boolean' },
+      name: { type: 'string' },
+      'dry-run': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -98,8 +109,21 @@ if (command === 'set-password') {
   process.exit(0);
 }
 
-if (command) fail(`unknown command "${command}". Run "webterm --help" for usage.`);
+if (command === 'uninstall-service') {
+  if (rest.length) fail('usage: webterm uninstall-service [--name <name>]');
+  const { uninstallService } = await import('../lib/service.js');
+  try {
+    uninstallService({ name: opts.name || 'webterm' });
+  } catch (err) {
+    fail(err.message);
+  }
+  process.exit(0);
+}
+
+if (command && command !== 'install-service') fail(`unknown command "${command}". Run "webterm --help" for usage.`);
+if (command === 'install-service' && rest.length) fail('usage: webterm install-service [options]');
 if (opts.print) fail('--print only applies to "webterm set-password"');
+if (!command && (opts.name || opts['dry-run'])) fail('--name and --dry-run only apply to install-service (and --name to uninstall-service)');
 
 const host = opts.host || process.env.WEBTERM_HOST || '127.0.0.1';
 const port = Number(opts.port || process.env.WEBTERM_PORT || 2828);
@@ -115,6 +139,44 @@ if (!Number.isFinite(timeoutHours) || timeoutHours < 0) fail(`invalid shell time
 const detachedTimeoutMs = Math.min(Math.floor(timeoutHours * 3600 * 1000), 2 ** 31 - 1);
 const shell =
   opts.shell || process.env.WEBTERM_SHELL || process.env.SHELL || (os.platform() === 'win32' ? 'powershell.exe' : 'bash');
+
+if (command === 'install-service') {
+  // Check credentials now, so a broken setup fails here rather than in a restart loop.
+  const auth = await import('../lib/auth.js');
+  let source;
+  try {
+    source = auth.loadCredentials(configPath).source;
+  } catch (err) {
+    fail(err.message);
+  }
+  if (source === 'environment' && !fs.existsSync('.env')) {
+    console.warn(
+      'warning: credentials come from environment variables in your current shell, which the\n' +
+        '         service will not see. Put them in a .env file in this directory, or use a config file.\n',
+    );
+  }
+  // Forward the server options given on the command line. The shell is always pinned, since
+  // the service manager's environment may not have SHELL.
+  const serverArgs = ['--shell', shell];
+  if (opts.host) serverArgs.push('--host', opts.host);
+  if (opts.port) serverArgs.push('--port', String(port));
+  if (opts.config) serverArgs.push('--config', configPath);
+  if (opts['max-upload'] !== undefined) serverArgs.push('--max-upload', opts['max-upload']);
+  if (opts['shell-timeout'] !== undefined) serverArgs.push('--shell-timeout', opts['shell-timeout']);
+
+  const { installService } = await import('../lib/service.js');
+  try {
+    installService({
+      name: opts.name || 'webterm',
+      entry: fileURLToPath(import.meta.url),
+      serverArgs,
+      dryRun: Boolean(opts['dry-run']),
+    });
+  } catch (err) {
+    fail(err.message);
+  }
+  process.exit(0);
+}
 
 // Load node-pty (and the rest of the server) only when actually serving, so that
 // --help and set-password work even if the native module failed to install.
