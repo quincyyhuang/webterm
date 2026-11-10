@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#181825" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>webterm</title>
+    <link rel="stylesheet" href="/xterm.css" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <span class="dots"><i></i><i></i><i></i></span>
+      <span id="title">webterm</span>
+      <button id="font-down" class="hdr-btn" tabindex="-1" aria-label="Smaller text">A−</button>
+      <button id="font-up" class="hdr-btn" tabindex="-1" aria-label="Larger text">A+</button>
+      <span id="status" class="connecting">connecting…</span>
+      <form method="post" action="/logout" class="logout">
+        <button class="hdr-btn" tabindex="-1" aria-label="Log out" title="Log out">⏻</button>
+      </form>
+    </header>
+    <main id="terminal"></main>
+    <nav id="keys" aria-label="Extra keys">
+      <button data-key="esc">Esc</button>
+      <button data-key="tab">Tab</button>
+      <button data-mod="ctrl">Ctrl</button>
+      <button data-mod="alt">Alt</button>
+      <button data-key="left" data-repeat aria-label="Left">←</button>
+      <button data-key="up" data-repeat aria-label="Up">↑</button>
+      <button data-key="down" data-repeat aria-label="Down">↓</button>
+      <button data-key="right" data-repeat aria-label="Right">→</button>
+      <button data-text="|">|</button>
+      <button data-text="~">~</button>
+      <button data-text="/">/</button>
+      <button data-text="-">-</button>
+      <button data-key="home">Home</button>
+      <button data-key="end">End</button>
+      <button data-key="pgup">PgUp</button>
+      <button data-key="pgdn">PgDn</button>
+      <button data-action="paste">Paste</button>
+      <button data-action="keyboard" aria-label="Toggle keyboard">⌨</button>
+    </nav>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

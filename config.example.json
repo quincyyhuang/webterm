@@ -1,0 +1,4 @@
+{
+  "username": "admin",
+  "passwordHash": "scrypt$<salt base64>$<hash base64>  (generate with: webterm set-password admin)"
+}
