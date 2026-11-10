@@ -19,6 +19,12 @@ Options:
   -s, --shell <path>    shell to run         (env WEBTERM_SHELL or SHELL)
   -c, --config <path>   credentials file     (env WEBTERM_CONFIG,
                                               default ~/.config/webterm/config.json)
+      --max-upload <MB> per-file upload limit (env WEBTERM_MAX_UPLOAD_MB,
+                                              default 1024; 0 = unlimited)
+      --shell-timeout <hours>
+                        end the shared shell after this long with no tabs open
+                                              (env WEBTERM_SHELL_TIMEOUT_HOURS,
+                                              default 168 = 7 days; 0 = never)
       --print           set-password: print env vars instead of writing the file
   -h, --help            show this help
   -v, --version         show the version
@@ -42,6 +48,8 @@ try {
       port: { type: 'string', short: 'p' },
       shell: { type: 'string', short: 's' },
       config: { type: 'string', short: 'c' },
+      'max-upload': { type: 'string' },
+      'shell-timeout': { type: 'string' },
       print: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
@@ -96,6 +104,15 @@ if (opts.print) fail('--print only applies to "webterm set-password"');
 const host = opts.host || process.env.WEBTERM_HOST || '127.0.0.1';
 const port = Number(opts.port || process.env.WEBTERM_PORT || 2828);
 if (!Number.isInteger(port) || port < 1 || port > 65535) fail(`invalid port "${opts.port || process.env.WEBTERM_PORT}"`);
+const maxUploadRaw = opts['max-upload'] ?? process.env.WEBTERM_MAX_UPLOAD_MB ?? '1024';
+const maxUploadMb = Number(maxUploadRaw);
+if (!Number.isFinite(maxUploadMb) || maxUploadMb < 0) fail(`invalid upload limit "${maxUploadRaw}"`);
+const maxUploadBytes = Math.floor(maxUploadMb * 1024 * 1024);
+const timeoutRaw = opts['shell-timeout'] ?? process.env.WEBTERM_SHELL_TIMEOUT_HOURS ?? '168';
+const timeoutHours = Number(timeoutRaw);
+// setTimeout overflows above ~24.8 days; cap there (longer is effectively "a long time").
+if (!Number.isFinite(timeoutHours) || timeoutHours < 0) fail(`invalid shell timeout "${timeoutRaw}"`);
+const detachedTimeoutMs = Math.min(Math.floor(timeoutHours * 3600 * 1000), 2 ** 31 - 1);
 const shell =
   opts.shell || process.env.WEBTERM_SHELL || process.env.SHELL || (os.platform() === 'win32' ? 'powershell.exe' : 'bash');
 
@@ -125,7 +142,7 @@ try {
 }
 
 try {
-  await startServer({ host, port, shell, credentials });
+  await startServer({ host, port, shell, credentials, maxUploadBytes, detachedTimeoutMs });
 } catch (err) {
   fail(`could not listen on ${host}:${port}: ${err.message}`);
 }

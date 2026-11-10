@@ -18,13 +18,32 @@
     <header>
       <span class="dots"><i></i><i></i><i></i></span>
       <span id="title">webterm</span>
-      <button id="font-down" class="hdr-btn" tabindex="-1" aria-label="Smaller text">A−</button>
-      <button id="font-up" class="hdr-btn" tabindex="-1" aria-label="Larger text">A+</button>
+      <button id="files-btn" class="hdr-btn" tabindex="-1" aria-label="Files" title="Upload / download files"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3 6a2 2 0 0 1 2-2h4.2a2 2 0 0 1 1.4.6L12 6h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+      <button id="settings-btn" class="hdr-btn" tabindex="-1" aria-label="Settings" title="Settings" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg></button>
       <span id="status" class="connecting">connecting…</span>
       <form method="post" action="/logout" class="logout">
         <button class="hdr-btn" tabindex="-1" aria-label="Log out" title="Log out">⏻</button>
       </form>
     </header>
+    <div id="settings" class="popover" role="dialog" aria-label="Settings" hidden>
+      <div class="setting-row">
+        <span>Text size</span>
+        <span class="font-controls">
+          <button id="font-down" class="hdr-btn" aria-label="Smaller text">A−</button>
+          <span id="font-size" aria-live="polite"></span>
+          <button id="font-up" class="hdr-btn" aria-label="Larger text">A+</button>
+        </span>
+      </div>
+      <label class="setting-row check">
+        <input type="checkbox" id="shell-per-tab" />
+        <span>
+          New shell for each tab
+          <small>Off: every tab shows the same shell, which keeps running when you close the page or log out.
+            On: each tab gets its own shell, which ends when the tab is closed or you log out.</small>
+          <small id="shell-mode-note" class="note" hidden>Takes effect in tabs opened from now on.</small>
+        </span>
+      </label>
+    </div>
     <main id="terminal"></main>
     <nav id="keys" aria-label="Extra keys">
       <button data-key="esc">Esc</button>
@@ -46,6 +65,28 @@
       <button data-action="paste">Paste</button>
       <button data-action="keyboard" aria-label="Toggle keyboard">⌨</button>
     </nav>
+    <div id="files" class="modal" hidden>
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="files-title">
+        <div class="panel-head">
+          <span id="files-title">Files</span>
+          <button id="files-close" class="icon-btn" aria-label="Close">✕</button>
+        </div>
+        <div class="panel-toolbar">
+          <button id="files-up" class="icon-btn" title="Parent directory" aria-label="Parent directory">↑</button>
+          <button id="files-shell" class="icon-btn" title="Go to the terminal's current directory" aria-label="Terminal directory">⌂</button>
+          <button id="files-refresh" class="icon-btn" title="Refresh" aria-label="Refresh">⟳</button>
+          <label class="toggle"><input type="checkbox" id="files-hidden" /> Hidden</label>
+          <button id="files-upload" class="primary">Upload</button>
+          <input type="file" id="files-input" multiple hidden />
+        </div>
+        <nav id="files-path" class="crumbs" aria-label="Current directory"></nav>
+        <p id="files-error" class="error" role="alert" hidden></p>
+        <ul id="files-list"></ul>
+        <div id="files-transfers"></div>
+        <p class="hint">Tap a file to download it. Drop files anywhere to upload them here.</p>
+      </div>
+    </div>
+    <div id="drop-overlay" aria-hidden="true">Drop files to upload</div>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

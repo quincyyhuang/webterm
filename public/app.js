@@ -1,6 +1,7 @@
 import { Terminal } from '/xterm.js';
 import { FitAddon } from '/addon-fit.js';
 import { WebLinksAddon } from '/addon-web-links.js';
+import { initFiles } from '/files.js';
 
 const statusEl = document.getElementById('status');
 const titleEl = document.getElementById('title');
@@ -84,8 +85,11 @@ function setFontSize(size) {
   fontSize = Math.min(28, Math.max(8, size));
   term.options.fontSize = fontSize;
   localStorage.setItem(FONT_KEY, String(fontSize));
+  fontSizeEl.textContent = String(fontSize);
   fit.fit();
 }
+const fontSizeEl = document.getElementById('font-size');
+fontSizeEl.textContent = String(fontSize);
 document.getElementById('font-down').addEventListener('click', () => setFontSize(fontSize - 1));
 document.getElementById('font-up').addEventListener('click', () => setFontSize(fontSize + 1));
 
@@ -98,6 +102,15 @@ term.onTitleChange((title) => {
 // Connection
 // ---------------------------------------------------------------------------
 let ws;
+let shellId = null; // the server-side shell this tab is attached to (also used by the files panel)
+
+// Shell mode (saved per browser, read once when the tab opens so a tab never switches mode):
+//   shared: every tab shows the same shell, which keeps running after tabs close or logout.
+//   tab:    each tab gets its own shell, which ends when the tab closes or the user logs out.
+const MODE_KEY = 'webterm.shellMode';
+const getShellMode = () => (localStorage.getItem(MODE_KEY) === 'tab' ? 'tab' : 'shared');
+const setShellMode = (mode) => localStorage.setItem(MODE_KEY, mode);
+const tabMode = getShellMode();
 
 function setStatus(state, text) {
   statusEl.className = state;
@@ -111,15 +124,35 @@ function send(msg) {
 function connect() {
   setStatus('connecting', 'connecting…');
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/pty`);
+  const params = new URLSearchParams({ mode: tabMode, cols: String(term.cols), rows: String(term.rows) });
+  const socket = new WebSocket(`${proto}://${location.host}/pty?${params}`);
+  socket.binaryType = 'arraybuffer';
+  ws = socket;
 
-  ws.onopen = () => {
-    setStatus('connected', 'connected');
-    send({ type: 'resize', cols: term.cols, rows: term.rows });
+  socket.onopen = () => setStatus('connected', 'connected');
+
+  // Binary frames are terminal output; text frames are JSON control messages.
+  socket.onmessage = (ev) => {
+    if (typeof ev.data !== 'string') {
+      term.write(new Uint8Array(ev.data));
+      return;
+    }
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'attached') {
+      shellId = msg.id;
+      statusEl.title = msg.shared ? 'Shared shell: the same in every tab' : 'This tab has its own shell';
+      term.reset(); // a running shell's screen is re-sent in full right after this
+      if (msg.restored) {
+        setStatus('connected', 'resumed');
+        setTimeout(() => ws === socket && socket.readyState === WebSocket.OPEN && setStatus('connected', 'connected'), 3000);
+      }
+    }
   };
-  ws.onmessage = (ev) => term.write(ev.data);
-  ws.onclose = async () => {
-    // If the session expired (or the server restarted), go back to the login page.
+
+  socket.onclose = async (ev) => {
+    if (ws !== socket) return;
+    shellId = null;
+    // If the login expired (or the server restarted), go back to the login page.
     try {
       const res = await fetch('/session', { cache: 'no-store' });
       if (res.status === 401) {
@@ -129,13 +162,20 @@ function connect() {
     } catch {
       /* server unreachable: fall through to the reconnect prompt */
     }
+    let note;
+    if (ev.code === 1000 && ev.reason === 'Shell exited') note = 'shell exited — press Enter to start a new one';
+    else if (tabMode === 'tab') note = 'disconnected; this tab\'s shell has ended — press Enter to start a new one';
+    else note = 'disconnected — press Enter to reconnect';
     setStatus('disconnected', 'disconnected — tap to reconnect');
-    term.write('\r\n\x1b[2m[session closed — press Enter or tap status to reconnect]\x1b[0m\r\n');
+    term.write(`\r\n\x1b[2m[${note}]\x1b[0m\r\n`);
   };
 }
 
+// With a shared shell open in several tabs, the shell's size follows the tab in use.
+term.textarea?.addEventListener('focus', () => send({ type: 'focus' }));
+window.addEventListener('focus', () => send({ type: 'focus' }));
+
 function reconnect() {
-  term.reset();
   connect();
   term.focus();
 }
@@ -351,5 +391,46 @@ termEl.addEventListener('touchend', () => {
   if (touchY !== null && !touchMoved) term.focus();
   touchY = null;
 });
+
+// ---------------------------------------------------------------------------
+// Settings popover
+// ---------------------------------------------------------------------------
+function initSettings({ getShellMode, setShellMode, onClose }) {
+  const btn = document.getElementById('settings-btn');
+  const pop = document.getElementById('settings');
+  const perTab = document.getElementById('shell-per-tab');
+  const note = document.getElementById('shell-mode-note');
+
+  function sync() {
+    perTab.checked = getShellMode() === 'tab'; // may have been changed in another tab
+    note.hidden = getShellMode() === tabMode;
+  }
+  perTab.addEventListener('change', () => {
+    setShellMode(perTab.checked ? 'tab' : 'shared');
+    sync();
+  });
+
+  function open() {
+    sync();
+    pop.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+  }
+  function close() {
+    if (pop.hidden) return;
+    pop.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+    onClose();
+  }
+  btn.addEventListener('click', () => (pop.hidden ? open() : close()));
+  document.addEventListener('pointerdown', (e) => {
+    if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !pop.hidden) close();
+  });
+}
+
+initFiles({ getTermId: () => shellId, onClose: () => term.focus() });
+initSettings({ getShellMode, setShellMode, onClose: () => term.focus() });
 
 connect();

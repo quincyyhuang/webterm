@@ -1,6 +1,6 @@
 # webterm
 
-A password-protected terminal in your browser. xterm.js runs in the page, node-pty runs a real shell on the server, and a WebSocket connects them. Works on desktop and mobile.
+A password-protected terminal in your browser. xterm.js runs in the page, node-pty runs a real shell on the server, and a WebSocket connects them. Works on desktop and mobile, keeps your shell running while you're away (shared across tabs and devices), and can upload and download files.
 
 ## Quick start
 
@@ -41,9 +41,35 @@ webterm set-password <username> [--print] create credentials
 -s, --shell <path>    shell to run         (env WEBTERM_SHELL or SHELL)
 -c, --config <path>   credentials file     (env WEBTERM_CONFIG,
                                             default ~/.config/webterm/config.json)
+    --max-upload <MB> per-file upload limit (env WEBTERM_MAX_UPLOAD_MB,
+                                            default 1024; 0 = unlimited)
+    --shell-timeout <hours>
+                      end the shared shell after this long with no tabs open
+                                           (env WEBTERM_SHELL_TIMEOUT_HOURS,
+                                            default 168 = 7 days; 0 = never)
 ```
 
 Command-line options override environment variables. A `.env` file in the current directory is loaded automatically, but variables already set in the environment take precedence over it.
+
+## Shells
+
+There are two modes, chosen with **New shell for each tab** in the ⚙ settings menu. The setting is saved per browser and applies to tabs opened after you change it.
+
+- **Shared shell (default):** there is one shell. Every tab, on any browser or device, shows that same shell live, so typing in one tab shows up in the others. Closing tabs or logging out leaves it running. When you come back, the screen, scrollback and any running program (even full-screen ones like `vim` or `less`) are restored exactly as you left them. The terminal size follows the tab you're actively using.
+- **New shell for each tab:** every tab gets its own shell. It ends when the tab is closed (or reloaded) or you log out.
+
+Type `exit` to end a shell. For the shared shell, that ends it in every tab, and pressing Enter starts a new one. A shared shell with no tabs open is ended after 7 days; change this with `--shell-timeout`. Restarting the server ends all shells.
+
+## Files
+
+The folder button in the header opens a file browser that starts in your terminal's current directory.
+
+- **Download:** tap a file.
+- **Upload:** use the Upload button, or drag files anywhere onto the page. Files go into the directory being shown.
+- **Existing files** are never replaced without asking.
+- **Partial files:** uploads are written to a temporary file and renamed into place, so a failed or cancelled upload leaves nothing behind.
+
+Files are read and written with the permissions of the user running webterm, the same as the shell. Finding the terminal's directory works on Linux and macOS; elsewhere the browser starts in your home directory.
 
 ## Credentials
 
@@ -60,7 +86,7 @@ webterm set-password alice --print    # prompt, then print WEBTERM_USER / WEBTER
 echo 'secret pw' | webterm set-password alice   # non-interactive
 ```
 
-Restart the server after changing credentials. Sessions are held in memory, so a restart logs everyone out; otherwise they last 7 days. After 5 failed logins, an IP address is locked out for 15 minutes.
+Restart the server after changing credentials. Sessions are held in memory, so a restart logs everyone out; otherwise they last 1 day. After 5 failed logins, an IP address is locked out for 15 minutes.
 
 ## Development
 
