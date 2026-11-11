@@ -37,7 +37,8 @@
     "start": "node bin/webterm.js",
     "set-password": "node bin/webterm.js set-password",
     "install-service": "node bin/webterm.js install-service",
-    "uninstall-service": "node bin/webterm.js uninstall-service"
+    "uninstall-service": "node bin/webterm.js uninstall-service",
+    "update-themes": "node scripts/update-themes.mjs"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",

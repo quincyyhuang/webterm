@@ -100,6 +100,16 @@ There are two modes, chosen with **New shell for each tab** in the ⚙ settings 
 
 Type `exit` to end a shell. For the shared shell, that ends it in every tab, and pressing Enter starts a new one. A shared shell with no tabs open is ended after 7 days; change this with `--shell-timeout`. Restarting the server ends all shells.
 
+## Color themes
+
+Pick a theme in the ⚙ settings menu under **Theme**. It offers the 900+ schemes from [iTerm2-Color-Schemes](https://github.com/mbadolato/iTerm2-Color-Schemes) (MIT). The default is Ghostty's built-in color scheme.
+
+- **Finding one:** search by name, filter by dark or light, and hover or use ↑/↓ to preview it live on your terminal. Click or press Enter to choose; Esc or ✕ closes the picker and drops any preview.
+- **Follow system light/dark:** keeps one light and one dark theme and switches with your OS appearance.
+- **Everything follows the theme:** the header, menus, panels and the login page take their colors from the chosen terminal palette, with contrast checks so text stays readable.
+- **Saved per browser,** like text size. The page applies it before it first draws, so there's no flash of the default colors.
+- **Bundled:** the schemes ship in `public/themes.json`, so webterm never contacts GitHub. To refresh them from upstream, run `npm run update-themes`.
+
 ## Copy and paste
 
 Select text with the mouse, then:

@@ -4,6 +4,8 @@ import { WebLinksAddon } from '/addon-web-links.js';
 import { initFiles } from '/files.js';
 import { initBell } from '/bell.js';
 import { initNotifySettings } from '/notify-settings.js';
+import { activeTheme, applyPageTheme, onSystemChange } from '/theme.js';
+import { initThemePicker } from '/theme-picker.js';
 
 const statusEl = document.getElementById('status');
 const titleEl = document.getElementById('title');
@@ -41,28 +43,7 @@ const term = new Terminal({
   // macOS: Option+drag makes a normal selection even when a program (e.g. Claude Code, vim
   // with mouse=a) captures the mouse. Elsewhere xterm.js uses Shift+drag for this.
   macOptionClickForcesSelection: true,
-  theme: {
-    background: '#1e1e2e',
-    foreground: '#cdd6f4',
-    cursor: '#f5e0dc',
-    selectionBackground: '#585b7066',
-    black: '#45475a',
-    red: '#f38ba8',
-    green: '#a6e3a1',
-    yellow: '#f9e2af',
-    blue: '#89b4fa',
-    magenta: '#f5c2e7',
-    cyan: '#94e2d5',
-    white: '#bac2de',
-    brightBlack: '#585b70',
-    brightRed: '#f38ba8',
-    brightGreen: '#a6e3a1',
-    brightYellow: '#f9e2af',
-    brightBlue: '#89b4fa',
-    brightMagenta: '#f5c2e7',
-    brightCyan: '#94e2d5',
-    brightWhite: '#a6adc8',
-  },
+  theme: applyPageTheme(activeTheme()),
 });
 
 const fit = new FitAddon();
@@ -726,6 +707,14 @@ function initSettings({ getShellMode, setShellMode, onClose }) {
     if (e.key === 'Escape' && !pop.hidden) close();
   });
 }
+
+// Color theme: the picker previews/applies themes; "follow system" reacts to OS changes.
+const showTheme = (theme) => (term.options.theme = applyPageTheme(theme));
+const themePicker = initThemePicker({ apply: showTheme });
+themePicker.onClose = () => term.focus();
+onSystemChange(() => {
+  if (document.getElementById('themes').hidden) showTheme(activeTheme());
+});
 
 initFiles({ getTermId: () => shellId, onClose: () => term.focus() });
 initSettings({ getShellMode, setShellMode, onClose: () => term.focus() });

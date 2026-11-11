@@ -6,7 +6,19 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <meta name="theme-color" content="#181825" />
+    <meta name="theme-color" content="#20232a" />
+    <script>
+      // Apply the saved color theme before first paint (no flash of the default colors).
+      // Written by /theme.js; see saveChoice() there.
+      try {
+        const t = JSON.parse(localStorage.getItem('webterm.themeVars') || 'null');
+        const v = t && (t.fixed || (matchMedia('(prefers-color-scheme: dark)').matches ? t.dark : t.light));
+        if (v) {
+          for (const k in v) document.documentElement.style.setProperty(k, v[k]);
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', v['--panel']);
+        }
+      } catch {}
+    </script>
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -26,6 +38,10 @@
       </form>
     </header>
     <div id="settings" class="popover" role="dialog" aria-label="Settings" hidden>
+      <div class="setting-row">
+        <span>Theme</span>
+        <button id="theme-btn" class="hdr-btn theme-btn" type="button"><span id="theme-name"></span> ›</button>
+      </div>
       <div class="setting-row">
         <span>Text size</span>
         <span class="font-controls">
@@ -118,6 +134,32 @@
         <ul id="files-list"></ul>
         <div id="files-transfers"></div>
         <p class="hint">Tap a file to download it. Drop files anywhere to upload them here.</p>
+      </div>
+    </div>
+    <div id="themes" class="modal" hidden>
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="themes-title">
+        <div class="panel-head">
+          <span id="themes-title">Theme</span>
+          <button id="themes-close" class="icon-btn" aria-label="Close">✕</button>
+        </div>
+        <div class="panel-toolbar themes-toolbar">
+          <input id="themes-search" type="search" placeholder="Search 900+ themes" autocomplete="off" spellcheck="false" />
+          <span id="themes-filter" class="segmented" role="group" aria-label="Filter">
+            <button data-filter="all" class="active">All</button><button data-filter="dark">Dark</button><button data-filter="light">Light</button>
+          </span>
+        </div>
+        <div class="panel-toolbar themes-mode">
+          <label class="toggle"><input type="checkbox" id="themes-system" /> Follow system light/dark</label>
+          <span id="themes-slots" class="segmented" hidden>
+            <button id="slot-light" type="button"></button><button id="slot-dark" type="button"></button>
+          </span>
+        </div>
+        <ul id="themes-list"></ul>
+        <p class="hint">
+          Hover or use ↑/↓ to preview; click or Enter to choose. Themes from
+          <a href="https://github.com/mbadolato/iTerm2-Color-Schemes" target="_blank" rel="noopener">iTerm2-Color-Schemes</a>
+          (<a href="/themes-license.txt" target="_blank">MIT</a>).
+        </p>
       </div>
     </div>
     <div id="drop-overlay" aria-hidden="true">Drop files to upload</div>
