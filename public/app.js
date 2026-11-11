@@ -302,6 +302,9 @@ statusEl.addEventListener('click', () => {
 });
 
 term.onResize(({ cols, rows }) => send({ type: 'resize', cols, rows }));
+// Mouse reports in the classic X10 encoding can contain bytes above 127, so xterm.js emits them
+// as raw bytes here instead of onData; the server writes them unchanged.
+term.onBinary((data) => send({ type: 'binary', data }));
 
 // ---------------------------------------------------------------------------
 // Copy
@@ -667,8 +670,25 @@ termEl.addEventListener(
     if (!lines) return;
     touchAccum -= lines * lineHeight;
 
-    if (term.buffer.active.type === 'alternate') {
-      // Full-screen app: no scrollback, so emulate arrow keys.
+    if (term.modes.mouseTrackingMode !== 'none') {
+      // The program handles the mouse itself (Claude Code, vim with mouse=a, tmux, htop): send
+      // mouse-wheel events at the finger's position, as a desktop wheel would, so it scrolls its
+      // own view. xterm.js encodes them in whatever mouse protocol the program asked for.
+      const t = e.touches[0];
+      for (let i = 0; i < Math.abs(lines); i++) {
+        screen?.dispatchEvent(
+          new WheelEvent('wheel', {
+            deltaY: Math.sign(lines),
+            deltaMode: WheelEvent.DOM_DELTA_LINE,
+            clientX: t.clientX,
+            clientY: t.clientY,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      }
+    } else if (term.buffer.active.type === 'alternate') {
+      // Full-screen program without mouse support (less, man): no scrollback, so arrow keys.
       const seq = (term.modes.applicationCursorKeysMode ? '\x1bO' : '\x1b[') + (lines > 0 ? 'B' : 'A');
       send({ type: 'input', data: seq.repeat(Math.abs(lines)) });
     } else {

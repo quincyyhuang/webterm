@@ -139,6 +139,8 @@ Select text with the mouse, then:
 
 On phones and tablets, tap **Select** in the extra-keys bar, drag across the text (or tap a word), then tap **Copy**. Outside select mode, swiping scrolls as usual.
 
+**Scrolling on touch screens:** swipe to scroll. In the normal shell this scrolls the history. In full-screen programs that handle the mouse (Claude Code, vim with `mouse=a`, tmux, htop), a swipe sends mouse-wheel scrolling, like a desktop wheel, so they scroll their own view. In full-screen programs without mouse support (`less`, `man`), it sends ↑/↓ instead.
+
 Copying works over plain HTTP too: webterm falls back to the older copy mechanism when the browser's clipboard API isn't available. Pasting with the **Paste** key needs that API, so over plain HTTP it asks you to paste into a box instead.
 
 ## Flaky connections
