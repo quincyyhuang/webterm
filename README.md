@@ -5,7 +5,7 @@ A password-protected terminal in your browser. xterm.js runs in the page, node-p
 ## Quick start
 
 ```sh
-npx @quincyyhuang/webterm                      # http://127.0.0.1:2828
+npx @quincyhuang/webterm                      # http://127.0.0.1:2828
 ```
 
 The first time, there's no login yet, so webterm prints a one-time setup link. Open it to choose your username and password, and you're signed in.
@@ -13,7 +13,7 @@ The first time, there's no login yet, so webterm prints a one-time setup link. O
 Or install it globally to get a `webterm` command:
 
 ```sh
-npm install -g @quincyyhuang/webterm
+npm install -g @quincyhuang/webterm
 webterm --host 0.0.0.0 --port 2828
 ```
 
@@ -37,7 +37,7 @@ The service commands are Linux-only (systemd). On macOS and Windows, `install-se
 To keep webterm running in the background, start it at boot and restart it if it crashes, install it as a systemd **user** service. It runs as you, with no root needed:
 
 ```sh
-npm install -g @quincyyhuang/webterm      # a stable install path (not the npx cache)
+npm install -g @quincyhuang/webterm      # a stable install path (not the npx cache)
 cd ~/webterm                              # optional: a directory with your .env
 webterm install-service --host 0.0.0.0 --port 2828
 ```

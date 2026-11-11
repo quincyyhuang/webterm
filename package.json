@@ -1,5 +1,5 @@
 {
-  "name": "@quincyyhuang/webterm",
+  "name": "@quincyhuang/webterm",
   "version": "1.0.0",
   "description": "A password-protected terminal in your browser, built on xterm.js and node-pty",
   "keywords": [
