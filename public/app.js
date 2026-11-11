@@ -141,56 +141,135 @@ function send(msg) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
+// Connection lifecycle. Drops are retried automatically with growing delays; the shared shell
+// (and, for a couple of minutes, a per-tab shell) keeps running on the server meanwhile, and
+// its screen is restored exactly on reconnect.
+const RETRY_DELAYS = [500, 1000, 2000, 4000, 8000, 15000, 30000];
+const STALE_MS = 40000; // the server sends something at least every 15 s; silence this long = dead link
+let retryAttempt = 0;
+let retryTimer = null;
+let lastMessageAt = 0;
+let tabShellId = null; // per-tab mode: our shell, to resume after a drop (lives only as long as this page)
+let waitingForEnter = false; // the shell exited: start a new one only when the user asks
+
 function connect() {
-  setStatus('connecting', 'connecting…');
+  clearTimeout(retryTimer);
+  retryTimer = null;
+  waitingForEnter = false;
+  setStatus('connecting', retryAttempt ? 'reconnecting…' : 'connecting…');
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const params = new URLSearchParams({ mode: tabMode, cols: String(term.cols), rows: String(term.rows) });
+  if (tabMode === 'tab' && tabShellId) params.set('resume', tabShellId);
   const socket = new WebSocket(`${proto}://${location.host}/pty?${params}`);
   socket.binaryType = 'arraybuffer';
   ws = socket;
 
-  socket.onopen = () => setStatus('connected', 'connected');
+  socket.onopen = () => {
+    retryAttempt = 0;
+    lastMessageAt = Date.now();
+    setStatus('connected', 'connected');
+  };
 
   // Binary frames are terminal output; text frames are JSON control messages.
   socket.onmessage = (ev) => {
+    lastMessageAt = Date.now();
     if (typeof ev.data !== 'string') {
       term.write(new Uint8Array(ev.data));
       return;
     }
     const msg = JSON.parse(ev.data);
     if (msg.type === 'attached') {
+      const lostTabShell = tabMode === 'tab' && tabShellId && tabShellId !== msg.id;
       shellId = msg.id;
+      if (tabMode === 'tab') tabShellId = msg.id;
       statusEl.title = msg.shared ? 'Shared shell: the same in every tab' : 'This tab has its own shell';
       term.reset(); // a running shell's screen is re-sent in full right after this
+      if (lostTabShell) term.write('\x1b[2m[the previous shell ended while disconnected; this is a new one]\x1b[0m\r\n');
       reportWatching();
       if (msg.restored) {
         setStatus('connected', 'resumed');
         setTimeout(() => ws === socket && socket.readyState === WebSocket.OPEN && setStatus('connected', 'connected'), 3000);
       }
     }
+    // {type:'ping'} needs no reply: it only proves the link is alive (lastMessageAt above).
   };
 
-  socket.onclose = async (ev) => {
-    if (ws !== socket) return;
-    shellId = null;
-    // If the login expired (or the server restarted), go back to the login page.
-    try {
-      const res = await fetch('/session', { cache: 'no-store' });
-      if (res.status === 401) {
-        location.href = '/login';
-        return;
-      }
-    } catch {
-      /* server unreachable: fall through to the reconnect prompt */
-    }
-    let note;
-    if (ev.code === 1000 && ev.reason === 'Shell exited') note = 'shell exited — press Enter to start a new one';
-    else if (tabMode === 'tab') note = 'disconnected; this tab\'s shell has ended — press Enter to start a new one';
-    else note = 'disconnected — press Enter to reconnect';
-    setStatus('disconnected', 'disconnected — tap to reconnect');
-    term.write(`\r\n\x1b[2m[${note}]\x1b[0m\r\n`);
+  socket.onclose = (ev) => {
+    if (ws === socket) handleDisconnect(ev.code, ev.reason);
   };
 }
+
+async function handleDisconnect(code, reason) {
+  shellId = null;
+  // If the login expired (or the server restarted), go back to the login page.
+  try {
+    const res = await fetch('/session', { cache: 'no-store' });
+    if (res.status === 401) {
+      location.href = '/login';
+      return;
+    }
+  } catch {
+    /* server unreachable (network down): keep retrying below */
+  }
+  if (code === 1000 && reason === 'Shell exited') {
+    tabShellId = null;
+    waitingForEnter = true;
+    setStatus('disconnected', 'shell exited');
+    term.write('\r\n\x1b[2m[shell exited — press Enter to start a new one]\x1b[0m\r\n');
+    return;
+  }
+  scheduleRetry();
+}
+
+function scheduleRetry() {
+  clearTimeout(retryTimer);
+  const base = RETRY_DELAYS[Math.min(retryAttempt, RETRY_DELAYS.length - 1)];
+  const delay = Math.round(base * (0.8 + Math.random() * 0.4)); // jitter
+  retryAttempt++;
+  setStatus('disconnected', navigator.onLine === false ? 'offline — waiting for network' : 'reconnecting…');
+  retryTimer = setTimeout(connect, delay);
+}
+
+/** Give up on a connection that went silent (its close event may take minutes) and retry now. */
+function dropStaleConnection() {
+  const socket = ws;
+  socket.onclose = socket.onmessage = socket.onopen = null;
+  try {
+    socket.close();
+  } catch {
+    /* already closing */
+  }
+  retryAttempt = 0;
+  handleDisconnect(0, 'stale');
+}
+
+/** Reconnect right away, e.g. when the tab becomes visible again or the network comes back. */
+function reconnectNow() {
+  if (waitingForEnter) return;
+  if (ws.readyState === WebSocket.OPEN) {
+    if (Date.now() - lastMessageAt > STALE_MS) dropStaleConnection();
+    return;
+  }
+  if (ws.readyState === WebSocket.CONNECTING) return;
+  retryAttempt = 0;
+  connect();
+}
+
+setInterval(() => {
+  if (ws.readyState === WebSocket.OPEN && Date.now() - lastMessageAt > STALE_MS) dropStaleConnection();
+}, 5000);
+window.addEventListener('online', reconnectNow);
+window.addEventListener('pageshow', reconnectNow); // back from the back/forward cache
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) reconnectNow(); // phones drop connections in the background
+});
+
+// Leaving the page on purpose (closing the tab, reloading, logging out): tell the server, so a
+// per-tab shell ends now instead of waiting out the reconnect grace period.
+window.addEventListener('pagehide', () => {
+  clearTimeout(retryTimer);
+  send({ type: 'bye' });
+});
 
 // With a shared shell open in several tabs, the shell's size follows the tab in use.
 term.textarea?.addEventListener('focus', () => send({ type: 'focus' }));
@@ -204,12 +283,13 @@ window.addEventListener('focus', reportWatching);
 window.addEventListener('blur', reportWatching);
 
 function reconnect() {
+  retryAttempt = 0;
   connect();
   term.focus();
 }
 
 statusEl.addEventListener('click', () => {
-  if (ws.readyState === WebSocket.CLOSED) reconnect();
+  if (ws.readyState !== WebSocket.OPEN && ws.readyState !== WebSocket.CONNECTING) reconnect();
 });
 
 term.onResize(({ cols, rows }) => send({ type: 'resize', cols, rows }));
@@ -395,8 +475,10 @@ function applyMods(data, active) {
 
 // All keystrokes (typed, pasted, or from the bar) go through here.
 term.onData((data) => {
-  if (ws.readyState === WebSocket.CLOSED) {
-    if (data === '\r') reconnect();
+  if (ws.readyState !== WebSocket.OPEN) {
+    // Not connected: Enter starts a new shell after `exit`, or retries right away after a drop.
+    // The key itself is dropped, since we can't know what the shell will be doing.
+    if (data === '\r' && ws.readyState !== WebSocket.CONNECTING) reconnect();
     return;
   }
   // Modifiers only make sense for a single typed character, not for pastes.

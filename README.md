@@ -96,7 +96,7 @@ Command-line options override environment variables. A `.env` file in the curren
 There are two modes, chosen with **New shell for each tab** in the ⚙ settings menu. The setting is saved per browser and applies to tabs opened after you change it.
 
 - **Shared shell (default):** there is one shell. Every tab, on any browser or device, shows that same shell live, so typing in one tab shows up in the others. Closing tabs or logging out leaves it running. When you come back, the screen, scrollback and any running program (even full-screen ones like `vim` or `less`) are restored exactly as you left them. The terminal size follows the tab you're actively using.
-- **New shell for each tab:** every tab gets its own shell. It ends when the tab is closed (or reloaded) or you log out.
+- **New shell for each tab:** every tab gets its own shell. It ends when the tab is closed (or reloaded) or you log out. If the tab loses its connection instead, its shell waits 2 minutes for it to come back.
 
 Type `exit` to end a shell. For the shared shell, that ends it in every tab, and pressing Enter starts a new one. A shared shell with no tabs open is ended after 7 days; change this with `--shell-timeout`. Restarting the server ends all shells.
 
@@ -116,6 +116,12 @@ Select text with the mouse, then:
 On phones and tablets, tap **Select** in the extra-keys bar, drag across the text (or tap a word), then tap **Copy**. Outside select mode, swiping scrolls as usual.
 
 Copying works over plain HTTP too: webterm falls back to the older copy mechanism when the browser's clipboard API isn't available. Pasting with the **Paste** key needs that API, so over plain HTTP it asks you to paste into a box instead.
+
+## Flaky connections
+
+- **Automatic reconnect:** when the connection drops, webterm reconnects on its own, retrying with growing delays (up to 30 s apart). It also retries immediately when you return to the tab, or when the browser reports the network is back. The shell keeps running on the server meanwhile, and its screen is restored exactly. Keys typed while disconnected are discarded; pressing Enter retries right away.
+- **Dead connections are detected:** a connection that goes silent without closing (switching networks, a phone waking up) is noticed within about 45 s in the browser and 30 s on the server, using heartbeats every 15 s.
+- **Compression:** terminal output is compressed, which helps a lot on slow links.
 
 ## Terminal bell
 
