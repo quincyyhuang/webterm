@@ -32,6 +32,8 @@ Requires Node.js 20.12 or newer.
 
 ## Running as a service (Linux)
 
+The service commands are Linux-only (systemd). On macOS and Windows, `install-service` and `uninstall-service` stop with an error; run `webterm` directly, or use your platform's service manager.
+
 To keep webterm running in the background, start it at boot and restart it if it crashes, install it as a systemd **user** service. It runs as you, with no root needed:
 
 ```sh

@@ -14,8 +14,8 @@ Usage:
   webterm [options]                         start the server
   webterm set-password <username> [--print] create credentials
   webterm install-service [options]         run webterm as a systemd user service
-                                            (starts at boot, restarts on failure)
-  webterm uninstall-service [--name <n>]    stop and remove that service
+                                            (Linux only; starts at boot, restarts on failure)
+  webterm uninstall-service [--name <n>]    stop and remove that service (Linux only)
 
 Options:
   -H, --host <addr>     address to bind      (env WEBTERM_HOST, default 127.0.0.1)
@@ -112,6 +112,15 @@ if (command === 'set-password') {
     fail(err.message);
   }
   process.exit(0);
+}
+
+// The service commands manage systemd user units, so they only make sense on Linux. Check
+// before anything else (credentials, options), including for --dry-run.
+if ((command === 'install-service' || command === 'uninstall-service') && process.platform !== 'linux') {
+  fail(
+    `${command} is only available on Linux (it manages a systemd user service); ` +
+      `this system is ${process.platform}. Run \`webterm\` directly, or use your platform's service manager.`,
+  );
 }
 
 if (command === 'uninstall-service') {
