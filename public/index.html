@@ -32,6 +32,7 @@
     <header>
       <span class="dots"><i></i><i></i><i></i></span>
       <span id="title">webterm</span>
+      <button id="vk-btn" class="hdr-btn" tabindex="-1" aria-label="On-screen keyboard" aria-pressed="false" title="On-screen keyboard"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm1 3v2h2V8zm3 0v2h2V8zm3 0v2h2V8zm3 0v2h2V8zm3 0v2h2V8zM5 11v2h2v-2zm3 0v2h2v-2zm3 0v2h2v-2zm3 0v2h2v-2zm3 0v2h2v-2zM7 14v2h10v-2z"/></svg></button>
       <button id="files-btn" class="hdr-btn" tabindex="-1" aria-label="Files" title="Upload / download files"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3 6a2 2 0 0 1 2-2h4.2a2 2 0 0 1 1.4.6L12 6h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
       <button id="settings-btn" class="hdr-btn" tabindex="-1" aria-label="Settings" title="Settings" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg></button>
       <span id="status" class="connecting">connecting…</span>
@@ -104,8 +105,22 @@
     <nav id="keys" aria-label="Extra keys">
       <button data-key="esc">Esc</button>
       <button data-key="tab">Tab</button>
+      <button data-mod="shift" aria-label="Shift">⇧</button>
       <button data-mod="ctrl">Ctrl</button>
       <button data-mod="alt">Alt</button>
+      <button data-action="fn" aria-pressed="false" title="Function keys F1–F12">Fn</button>
+      <button data-key="f1" class="fn-key">F1</button>
+      <button data-key="f2" class="fn-key">F2</button>
+      <button data-key="f3" class="fn-key">F3</button>
+      <button data-key="f4" class="fn-key">F4</button>
+      <button data-key="f5" class="fn-key">F5</button>
+      <button data-key="f6" class="fn-key">F6</button>
+      <button data-key="f7" class="fn-key">F7</button>
+      <button data-key="f8" class="fn-key">F8</button>
+      <button data-key="f9" class="fn-key">F9</button>
+      <button data-key="f10" class="fn-key">F10</button>
+      <button data-key="f11" class="fn-key">F11</button>
+      <button data-key="f12" class="fn-key">F12</button>
       <button data-key="left" data-repeat aria-label="Left">←</button>
       <button data-key="up" data-repeat aria-label="Up">↑</button>
       <button data-key="down" data-repeat aria-label="Down">↓</button>
@@ -118,11 +133,14 @@
       <button data-key="end">End</button>
       <button data-key="pgup">PgUp</button>
       <button data-key="pgdn">PgDn</button>
+      <button data-key="ins">Ins</button>
+      <button data-key="del">Del</button>
       <button data-action="select">Select</button>
       <button data-action="copy">Copy</button>
       <button data-action="paste">Paste</button>
-      <button data-action="keyboard" aria-label="Toggle keyboard">⌨</button>
+      <button data-action="vkbd" aria-label="On-screen keyboard" aria-pressed="false" title="On-screen keyboard"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm1 3v2h2V8zm3 0v2h2V8zm3 0v2h2V8zm3 0v2h2V8zm3 0v2h2V8zM5 11v2h2v-2zm3 0v2h2v-2zm3 0v2h2v-2zm3 0v2h2v-2zm3 0v2h2v-2zM7 14v2h10v-2z"/></svg></button>
     </nav>
+    <div id="vkbd" role="group" aria-label="On-screen keyboard" hidden></div>
     <div id="files" class="modal" hidden>
       <div class="panel" role="dialog" aria-modal="true" aria-labelledby="files-title">
         <div class="panel-head">

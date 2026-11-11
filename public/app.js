@@ -6,6 +6,7 @@ import { initBell } from '/bell.js';
 import { initNotifySettings } from '/notify-settings.js';
 import { activeTheme, applyPageTheme, onSystemChange } from '/theme.js';
 import { initThemePicker } from '/theme-picker.js';
+import { initVirtualKeyboard } from '/vkbd.js';
 
 // A used setup link (#t=...) redirects here and keeps its fragment; drop it from the address bar.
 if (location.hash.startsWith('#t=')) history.replaceState(null, '', location.pathname + location.search);
@@ -439,8 +440,10 @@ term.attachCustomKeyEventHandler((e) => {
 // Sticky modifiers (Ctrl / Alt) from the extra-keys bar.
 // Tap = applies to the next key; double-tap = locked until tapped again.
 // ---------------------------------------------------------------------------
-const mods = { ctrl: 'off', alt: 'off' }; // 'off' | 'once' | 'locked'
-const lastModTap = { ctrl: 0, alt: 0 };
+const MOD_NAMES = ['shift', 'ctrl', 'alt'];
+const mods = { shift: 'off', ctrl: 'off', alt: 'off' }; // 'off' | 'once' | 'locked'
+const lastModTap = { shift: 0, ctrl: 0, alt: 0 };
+const anyMod = () => MOD_NAMES.some((k) => mods[k] !== 'off');
 
 function renderMods() {
   for (const btn of keysEl.querySelectorAll('[data-mod]')) {
@@ -459,9 +462,9 @@ function toggleMod(name) {
 }
 
 function consumeMods() {
-  const active = { ctrl: mods.ctrl !== 'off', alt: mods.alt !== 'off' };
+  const active = { shift: mods.shift !== 'off', ctrl: mods.ctrl !== 'off', alt: mods.alt !== 'off' };
   let changed = false;
-  for (const k of ['ctrl', 'alt']) {
+  for (const k of MOD_NAMES) {
     if (mods[k] === 'once') {
       mods[k] = 'off';
       changed = true;
@@ -480,6 +483,7 @@ function ctrlChar(ch) {
 }
 
 function applyMods(data, active) {
+  if (active.shift) data = data.toUpperCase(); // letters; other characters are unaffected
   if (active.ctrl) data = ctrlChar(data);
   if (active.alt) data = '\x1b' + data;
   return data;
@@ -494,7 +498,7 @@ term.onData((data) => {
     return;
   }
   // Modifiers only make sense for a single typed character, not for pastes.
-  if (data.length === 1 && (mods.ctrl !== 'off' || mods.alt !== 'off')) {
+  if (data.length === 1 && anyMod()) {
     data = applyMods(data, consumeMods());
   }
   send({ type: 'input', data });
@@ -503,14 +507,23 @@ term.onData((data) => {
 // ---------------------------------------------------------------------------
 // Extra-keys bar
 // ---------------------------------------------------------------------------
+// xterm key sequences. With modifiers, a parameter 1 + Shift(1) + Alt(2) + Ctrl(4) is added,
+// e.g. Shift+Left = ESC [1;2D, Ctrl+Del = ESC [3;5~, Shift+F5 = ESC [15;2~.
 const CURSOR_KEYS = { up: 'A', down: 'B', right: 'C', left: 'D', home: 'H', end: 'F' };
-const TILDE_KEYS = { pgup: '5', pgdn: '6' };
+const TILDE_KEYS = { ins: '2', del: '3', pgup: '5', pgdn: '6' };
+const SS3_FKEYS = { f1: 'P', f2: 'Q', f3: 'R', f4: 'S' }; // ESC O P .. ESC O S
+const TILDE_FKEYS = { f5: '15', f6: '17', f7: '18', f8: '19', f9: '20', f10: '21', f11: '23', f12: '24' };
 
 function keySequence(name) {
   const active = consumeMods();
-  const modParam = 1 + (active.alt ? 2 : 0) + (active.ctrl ? 4 : 0);
+  const modParam = 1 + (active.shift ? 1 : 0) + (active.alt ? 2 : 0) + (active.ctrl ? 4 : 0);
   if (name === 'esc') return '\x1b';
-  if (name === 'tab') return active.ctrl || active.alt ? '\x1b[Z' : '\t';
+  if (name === 'tab') return (active.alt ? '\x1b' : '') + (active.shift ? '\x1b[Z' : '\t'); // Shift+Tab = back-tab
+  if (name in SS3_FKEYS) return modParam > 1 ? `\x1b[1;${modParam}${SS3_FKEYS[name]}` : `\x1bO${SS3_FKEYS[name]}`;
+  if (name in TILDE_FKEYS) {
+    const n = TILDE_FKEYS[name];
+    return modParam > 1 ? `\x1b[${n};${modParam}~` : `\x1b[${n}~`;
+  }
   if (name in CURSOR_KEYS) {
     const code = CURSOR_KEYS[name];
     if (modParam > 1) return `\x1b[1;${modParam}${code}`;
@@ -529,9 +542,17 @@ function pressButton(btn) {
   if (key) return send({ type: 'input', data: keySequence(key) });
   if (text) return send({ type: 'input', data: applyMods(text, consumeMods()) });
   if (action === 'paste') return paste();
-  if (action === 'keyboard') return toggleKeyboard();
   if (action === 'select') return setSelectMode(!selectMode);
+  if (action === 'fn') return toggleFnKeys(btn);
   if (action === 'copy') return copySelection({ clear: true });
+}
+
+// Fn: switch the row to F1-F12 (modifiers stay, for e.g. Shift+F5) and back.
+function toggleFnKeys(btn) {
+  const on = keysEl.classList.toggle('fn-mode');
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', String(on));
+  btn.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 }
 
 async function paste() {
@@ -546,10 +567,6 @@ async function paste() {
   term.focus();
 }
 
-function toggleKeyboard() {
-  if (document.activeElement === term.textarea) term.blur();
-  else term.focus();
-}
 
 // Keep focus in the terminal while tapping the bar, so the soft keyboard stays open.
 keysEl.addEventListener('pointerdown', (e) => {
@@ -762,6 +779,13 @@ const themePicker = initThemePicker({ apply: showTheme });
 themePicker.onClose = () => term.focus();
 onSystemChange(() => {
   if (document.getElementById('themes').hidden) showTheme(activeTheme());
+});
+
+// On-screen keyboard: header button and the last key of the extra-keys row.
+initVirtualKeyboard({
+  term,
+  toggles: [document.getElementById('vk-btn'), keysEl.querySelector('[data-action="vkbd"]')],
+  touch: matchMedia('(pointer: coarse)').matches,
 });
 
 initFiles({ getTermId: () => shellId, onClose: () => term.focus() });

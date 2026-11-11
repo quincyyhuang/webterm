@@ -592,3 +592,69 @@ body.dragging #drop-overlay { display: flex; }
 .panel .hint a { color: var(--accent); }
 
 #cursor-style button { height: 28px; padding: 0 8px; font-size: 12px; }
+
+/* On-screen keyboard (public/vkbd.js). The extra-keys row stays above it as a function row,
+   on desktop too while it's open. */
+body.vk-open #keys { display: flex; }
+body.vk-open #keys { padding-bottom: 6px; }
+#keys button.active[data-action='vkbd'] { background: var(--accent); color: var(--on-accent); }
+#vk-btn.active { background: var(--accent); color: var(--on-accent); }
+#vk-btn svg { display: block; width: 15px; height: 15px; }
+#keys [data-action='vkbd'] svg { display: block; margin: 0 auto; width: 20px; height: 20px; }
+
+#vkbd {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  background: var(--panel);
+  border-top: 1px solid var(--surface);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+#vkbd[hidden] { display: none; }
+.vk-row {
+  display: flex;
+  gap: 5px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.vk-row > span { flex: 1 1 0; }
+.vk-key {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 42px;
+  padding: 0;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 18px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  box-shadow: 0 1px 0 var(--shadow);
+}
+.vk-key:active,
+.vk-key.pressed { background: var(--surface-2); }
+.vk-key.special { background: var(--surface-2); font-family: system-ui, sans-serif; font-size: 15px; }
+.vk-key.special:active,
+.vk-key.special.pressed { background: var(--surface); }
+.vk-key.space { font-family: system-ui, sans-serif; font-size: 13px; color: var(--muted); }
+.vk-key.enter { background: var(--accent); color: var(--on-accent); font-size: 20px; }
+.vk-key.enter:active { background: var(--accent-hover); }
+.vk-key.active { background: var(--accent); color: var(--on-accent); }
+.vk-key.locked { background: var(--pink); color: var(--on-accent); }
+@media (pointer: fine) {
+  .vk-key { height: 38px; cursor: pointer; }
+}
+/* Phones in landscape: shorter keys so the terminal keeps some room. */
+@media (max-height: 500px) {
+  .vk-key { height: 32px; font-size: 15px; }
+  #vkbd { gap: 4px; padding-top: 4px; }
+}
+
+/* Fn: the extra-keys row shows F1-F12 (plus modifiers, Fn and the keyboard toggle) instead. */
+#keys:not(.fn-mode) .fn-key { display: none; }
+#keys.fn-mode > button:not(.fn-key):not([data-mod]):not([data-action='fn']):not([data-action='vkbd']) { display: none; }
+#keys button[data-action='fn'].active { background: var(--accent); color: var(--on-accent); }
+#keys button[data-mod='shift'] { font-size: 20px; }

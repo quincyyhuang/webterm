@@ -124,6 +124,24 @@ Choose the cursor in the ⚙ settings menu (saved per browser):
 
 Programs can still change the cursor while they run; vim's insert-mode bar, for example. With **Hollow** selected, a program that asks for a block cursor gets the hollow one.
 
+## Extra keys (phones and tablets)
+
+On touch screens, a row of keys a phone keyboard lacks sits under the terminal; swipe it sideways for more. It also appears on desktop while the on-screen keyboard is open.
+
+- **Esc, Tab, arrows, Home, End, PgUp, PgDn, Ins, Del,** and the symbols `| ~ / -`.
+- **⇧, Ctrl and Alt** are sticky. Tap one and it applies to the next key; double-tap to lock it on. They combine with each other, so ⇧ then Tab sends Shift+Tab, Ctrl then ⇧ then → sends Ctrl+Shift+→, and Ctrl then **c** on your keyboard sends Ctrl+C.
+- **Fn** switches the row to **F1–F12** (with ⇧, Ctrl and Alt still available, for example Shift+F5). Tap it again to switch back.
+- **Select / Copy / Paste** for the clipboard, and the keyboard button to open the on-screen keyboard.
+
+## On-screen keyboard
+
+The keyboard button in the header, left of the folder button, opens webterm's own keyboard at the bottom of the screen. On phones it's also the last key of the extra-keys row.
+
+- **Layout:** a number row and QWERTY letters; **?123** switches to a symbols layer with what shells need: `` ~ ` | \ { } [ ] < > = + * ^ % # _ $ ; `` and more.
+- **⇧** capitalizes the next letter; double-tap it for caps lock. ⌫ and space repeat while held.
+- **The extra-keys row stays above it,** on desktop too while it's open, providing Esc, Tab, the arrows, F1–F12 and more (see [Extra keys](#extra-keys-phones-and-tablets)). Its sticky ⇧, Ctrl and Alt apply to the keyboard: Ctrl, then **c**, sends Ctrl+C.
+- **While it's open, the phone's own keyboard stays hidden,** even when you tap the terminal. A hardware keyboard keeps working. Close it with the same button.
+
 ## Copy and paste
 
 Select text with the mouse, then:
