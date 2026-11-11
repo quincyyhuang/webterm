@@ -38,6 +38,9 @@ const term = new Terminal({
   fontSize,
   scrollback: 10000,
   allowProposedApi: true,
+  // macOS: Option+drag makes a normal selection even when a program (e.g. Claude Code, vim
+  // with mouse=a) captures the mouse. Elsewhere xterm.js uses Shift+drag for this.
+  macOptionClickForcesSelection: true,
   theme: {
     background: '#1e1e2e',
     foreground: '#cdd6f4',
@@ -212,6 +215,135 @@ statusEl.addEventListener('click', () => {
 term.onResize(({ cols, rows }) => send({ type: 'resize', cols, rows }));
 
 // ---------------------------------------------------------------------------
+// Copy
+// ---------------------------------------------------------------------------
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+let toastAction = null;
+function toast(text, kind = '', { action = null, duration = 1600 } = {}) {
+  toastEl.textContent = text;
+  toastEl.className = `show ${kind}${action ? ' action' : ''}`;
+  toastAction = action;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastEl.className = '';
+    toastAction = null;
+  }, duration);
+}
+toastEl.addEventListener('click', () => {
+  const action = toastAction;
+  if (!action) return;
+  toastAction = null;
+  action(); // runs inside a click, so the browser allows clipboard writes
+});
+
+// Over plain HTTP (not localhost) navigator.clipboard doesn't exist, so fall back to
+// execCommand('copy'), filling in the clipboard from our own copy-event listener. Both need
+// a user gesture (a key press or tap), which every caller here is.
+function legacyCopy(text) {
+  let done = false;
+  const onCopy = (e) => {
+    e.clipboardData.setData('text/plain', text);
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    done = true;
+  };
+  document.addEventListener('copy', onCopy, { capture: true });
+  try {
+    document.execCommand('copy');
+  } catch {
+    /* unsupported */
+  } finally {
+    document.removeEventListener('copy', onCopy, { capture: true });
+  }
+  return done;
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      /* fall back */
+    }
+  }
+  return legacyCopy(text);
+}
+
+async function copySelection({ clear = false } = {}) {
+  const text = term.getSelection();
+  if (!text) {
+    toast('Nothing selected');
+    return;
+  }
+  const ok = await copyText(text);
+  if (clear) term.clearSelection();
+  if (selectMode && clear) setSelectMode(false);
+  toast(ok ? 'Copied' : 'Copy failed: try right-click → Copy', ok ? '' : 'error');
+}
+
+// OSC 52: a program asks the terminal to put text on the clipboard ("\e]52;c;<base64>\a").
+// Claude Code uses this for copy-on-select, as do vim/neovim and tmux (set-clipboard on).
+// Writes only: clipboard *reads* ("?") are refused, so programs can't see your clipboard.
+const OSC52_MAX = 1024 * 1024;
+term.parser.registerOscHandler(52, (data) => {
+  const sep = data.indexOf(';');
+  const payload = sep < 0 ? '' : data.slice(sep + 1);
+  if (!payload || payload === '?' || payload.length > (OSC52_MAX * 4) / 3 + 4) return true;
+  let text;
+  try {
+    const bytes = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
+    text = new TextDecoder().decode(bytes);
+  } catch {
+    return true; // not valid base64
+  }
+  // With a shared shell every open tab receives this; only the one you're using copies.
+  if (!text || document.hidden || !document.hasFocus()) return true;
+  osc52Copy(text);
+  return true;
+});
+
+async function osc52Copy(text) {
+  // Usually arrives right after your mouse-up, which counts as a recent user action, so the
+  // copy is allowed even over plain HTTP. If the browser still refuses (e.g. Safari, which
+  // only allows copying inside the click itself), offer a one-click copy.
+  if (await copyText(text)) {
+    toast('Copied');
+    return;
+  }
+  const n = text.length;
+  toast(`Click to copy ${n} character${n === 1 ? '' : 's'}`, '', {
+    duration: 8000,
+    action: () => {
+      const ok = legacyCopy(text);
+      toast(ok ? 'Copied' : 'Copy failed', ok ? '' : 'error');
+      term.focus();
+    },
+  });
+}
+
+// Ctrl+Shift+C copies (and keeps the browser from opening DevTools' element picker).
+// Ctrl+C copies when text is selected, like Windows Terminal; otherwise it interrupts as
+// usual. On macOS, Cmd+C already copies natively, and Ctrl+C always goes to the terminal.
+const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+term.attachCustomKeyEventHandler((e) => {
+  if (e.type !== 'keydown' || e.altKey || e.metaKey || !e.ctrlKey) return true;
+  if (e.key.toLowerCase() !== 'c') return true;
+  if (e.shiftKey) {
+    e.preventDefault();
+    copySelection();
+    return false;
+  }
+  if (!isMac && term.hasSelection()) {
+    e.preventDefault();
+    copySelection({ clear: true }); // cleared, so a second Ctrl+C interrupts
+    return false;
+  }
+  return true;
+});
+
+// ---------------------------------------------------------------------------
 // Sticky modifiers (Ctrl / Alt) from the extra-keys bar.
 // Tap = applies to the next key; double-tap = locked until tapped again.
 // ---------------------------------------------------------------------------
@@ -304,6 +436,8 @@ function pressButton(btn) {
   if (text) return send({ type: 'input', data: applyMods(text, consumeMods()) });
   if (action === 'paste') return paste();
   if (action === 'keyboard') return toggleKeyboard();
+  if (action === 'select') return setSelectMode(!selectMode);
+  if (action === 'copy') return copySelection({ clear: true });
 }
 
 async function paste() {
@@ -367,11 +501,46 @@ keysEl.addEventListener('pointerleave', () => stopRepeat(false));
 
 // ---------------------------------------------------------------------------
 // Touch: swipe to scroll scrollback (or send arrow keys in full-screen apps
-// like less/vim), tap to focus and open the keyboard.
+// like less/vim), tap to focus and open the keyboard. In select mode (the
+// "Select" key), dragging selects text instead and tapping selects a word.
 // ---------------------------------------------------------------------------
 let touchY = null;
 let touchAccum = 0;
 let touchMoved = false;
+let selectMode = false;
+let selectStart = null;
+
+function setSelectMode(on) {
+  selectMode = on;
+  keysEl.querySelector('[data-action="select"]')?.classList.toggle('active', on);
+  termEl.classList.toggle('selecting', on);
+  if (on) toast('Drag to select, tap a word, then Copy');
+}
+
+/** Buffer cell (absolute row) under a touch point. */
+function cellAt(touch) {
+  const screen = term.element.querySelector('.xterm-screen');
+  const rect = screen.getBoundingClientRect();
+  const clamp = (n, max) => Math.min(Math.max(n, 0), max);
+  const col = clamp(Math.floor(((touch.clientX - rect.left) / rect.width) * term.cols), term.cols - 1);
+  const row = clamp(Math.floor(((touch.clientY - rect.top) / rect.height) * term.rows), term.rows - 1);
+  return { col, row: row + term.buffer.active.viewportY };
+}
+
+function selectRange(a, b) {
+  const [start, end] = a.row < b.row || (a.row === b.row && a.col <= b.col) ? [a, b] : [b, a];
+  term.select(start.col, start.row, (end.row - start.row) * term.cols + end.col - start.col + 1);
+}
+
+function selectWordAt({ col, row }) {
+  const line = term.buffer.active.getLine(row)?.translateToString(true) || '';
+  if (!line[col] || /\s/.test(line[col])) return term.clearSelection();
+  let from = col;
+  let to = col;
+  while (from > 0 && !/\s/.test(line[from - 1])) from--;
+  while (to < line.length - 1 && !/\s/.test(line[to + 1])) to++;
+  term.select(from, row, to - from + 1);
+}
 
 termEl.addEventListener(
   'touchstart',
@@ -380,6 +549,7 @@ termEl.addEventListener(
     touchY = e.touches[0].clientY;
     touchAccum = 0;
     touchMoved = false;
+    if (selectMode) selectStart = cellAt(e.touches[0]);
   },
   { passive: true },
 );
@@ -390,6 +560,11 @@ termEl.addEventListener(
     if (touchY === null || e.touches.length !== 1) return;
     e.preventDefault();
     e.stopPropagation();
+    if (selectMode && selectStart) {
+      touchMoved = true;
+      selectRange(selectStart, cellAt(e.touches[0]));
+      return;
+    }
     const y = e.touches[0].clientY;
     touchAccum += touchY - y;
     touchY = y;
@@ -412,10 +587,23 @@ termEl.addEventListener(
   { passive: false },
 );
 
-termEl.addEventListener('touchend', () => {
-  if (touchY !== null && !touchMoved) term.focus();
-  touchY = null;
-});
+termEl.addEventListener(
+  'touchend',
+  (e) => {
+    if (selectMode) {
+      // Stop the browser's emulated mousedown/click after a tap: xterm would treat it as a
+      // click and clear the selection we just made.
+      e.preventDefault();
+      if (selectStart && !touchMoved) selectWordAt(selectStart);
+      selectStart = null;
+      touchY = null;
+      return;
+    }
+    if (touchY !== null && !touchMoved) term.focus();
+    touchY = null;
+  },
+  { passive: false },
+);
 
 // ---------------------------------------------------------------------------
 // Settings popover

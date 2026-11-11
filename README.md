@@ -100,6 +100,23 @@ There are two modes, chosen with **New shell for each tab** in the ⚙ settings 
 
 Type `exit` to end a shell. For the shared shell, that ends it in every tab, and pressing Enter starts a new one. A shared shell with no tabs open is ended after 7 days; change this with `--shell-timeout`. Restarting the server ends all shells.
 
+## Copy and paste
+
+Select text with the mouse, then:
+
+- **Ctrl+Shift+C** copies (on macOS, **Cmd+C**).
+- **Ctrl+C** copies when text is selected, and clears the selection, so pressing it again interrupts the program as usual. With nothing selected, it interrupts as always. (On macOS, Ctrl+C always goes to the terminal.)
+- **Ctrl+Insert** and the right-click menu's **Copy** also work.
+- Paste with **Ctrl+Shift+V** (on macOS, **Cmd+V**) or the right-click menu. Like most Linux terminals, plain **Ctrl+V** goes to the program (in shells it inserts the next key literally).
+
+**Programs that capture the mouse** (Claude Code, vim with `mouse=a`, tmux mouse mode, htop): dragging goes to the program.
+- Many of them copy what you select themselves, using the OSC 52 escape sequence: Claude Code does this by default, as do vim/neovim and tmux with `set-clipboard on`. webterm puts that text on your clipboard and shows "Copied". Over plain HTTP the browser only allows this right after a click or key press; if it refuses (Safari is strict about this), a **Click to copy** message appears, and one click finishes the copy. Only the tab you're using copies. Programs can write to the clipboard this way, but never read it.
+- To make a normal terminal selection over such a program instead, hold **Shift** while dragging (on macOS, **Option**).
+
+On phones and tablets, tap **Select** in the extra-keys bar, drag across the text (or tap a word), then tap **Copy**. Outside select mode, swiping scrolls as usual.
+
+Copying works over plain HTTP too: webterm falls back to the older copy mechanism when the browser's clipboard API isn't available. Pasting with the **Paste** key needs that API, so over plain HTTP it asks you to paste into a box instead.
+
 ## Terminal bell
 
 When a program rings the bell (`printf '\a'`, or a tool that beeps when it's done), the terminal briefly flashes. With reduced motion turned on, it shows an outline instead. If you're looking at another tab or window, the page title gets a 🔔 until you come back, so you can spot which tab wants attention. Turn on **Bell sound** in the ⚙ settings menu for a short beep too. It's off by default, and with the shared shell only one tab beeps. This works over plain HTTP: it doesn't use browser notifications, which require HTTPS.

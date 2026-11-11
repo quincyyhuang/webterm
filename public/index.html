@@ -94,6 +94,8 @@
       <button data-key="end">End</button>
       <button data-key="pgup">PgUp</button>
       <button data-key="pgdn">PgDn</button>
+      <button data-action="select">Select</button>
+      <button data-action="copy">Copy</button>
       <button data-action="paste">Paste</button>
       <button data-action="keyboard" aria-label="Toggle keyboard">⌨</button>
     </nav>
@@ -119,6 +121,7 @@
       </div>
     </div>
     <div id="drop-overlay" aria-hidden="true">Drop files to upload</div>
+    <div id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="/app.js"></script>
   </body>
 </html>
