@@ -5,15 +5,15 @@ A password-protected terminal in your browser. xterm.js runs in the page, node-p
 ## Quick start
 
 ```sh
-npx @quincyyhuang/webterm set-password alice   # prompts for a password
 npx @quincyyhuang/webterm                      # http://127.0.0.1:2828
 ```
+
+The first time, there's no login yet, so webterm prints a one-time setup link. Open it to choose your username and password, and you're signed in.
 
 Or install it globally to get a `webterm` command:
 
 ```sh
 npm install -g @quincyyhuang/webterm
-webterm set-password alice
 webterm --host 0.0.0.0 --port 2828
 ```
 
@@ -45,7 +45,7 @@ webterm install-service --host 0.0.0.0 --port 2828
 From a clone of this repository, use `npm run install-service -- --host 0.0.0.0` instead.
 
 - **Options:** server options you pass (`--host`, `--port`, `--config`, ...) are saved in the service. The service runs in the current directory, so a `.env` file there is used too. The shell is pinned to your current one.
-- **Before installing,** credentials are checked, so a broken setup fails right away instead of looping.
+- **Before installing,** the login is checked: a broken one fails right away instead of looping. If there's no login yet, the service starts in setup mode, and its one-time setup link appears in the output (and later in `journalctl --user -u webterm`).
 - **Lingering** is enabled if possible, so the service starts at boot and keeps running after you log out. See [Lingering](#lingering-keep-it-running-when-youre-logged-out) below.
 - **If the address isn't ready** (for example, at boot, before DHCP), the service retries every 5 seconds.
 - **Preview:** `--dry-run` prints the unit file without installing anything. `--name` picks a different unit name, so you can run several instances.
@@ -81,8 +81,9 @@ webterm uninstall-service [--name <n>]    stop and remove that service
 -H, --host <addr>     address to bind      (env WEBTERM_HOST, default 127.0.0.1)
 -p, --port <port>     port to listen on    (env WEBTERM_PORT, default 2828)
 -s, --shell <path>    shell to run         (env WEBTERM_SHELL or SHELL)
--c, --config <path>   credentials file     (env WEBTERM_CONFIG,
-                                            default ~/.config/webterm/config.json)
+-c, --config <path>   settings file: login and app settings
+                                            (env WEBTERM_CONFIG,
+                                            default ~/.config/webterm/settings.json)
     --max-upload <MB> per-file upload limit (env WEBTERM_MAX_UPLOAD_MB,
                                             default 1024; 0 = unlimited)
     --shell-timeout <hours>
@@ -161,7 +162,7 @@ Set it up in the app: open the ⚙ settings menu, go to **Push notifications**, 
 3. Optionally, add an access token for a protected topic, and turn on **Also notify on the terminal bell**.
 4. Click **Save**, then **Send test**.
 
-The settings apply immediately, with no restart. They're saved on the server in `settings.json`, next to the credentials file (default `~/.config/webterm/settings.json`), readable only by you, and shared by every browser. The token is never sent back to the browser. To turn notifications off, clear the topic URL and save.
+The settings apply immediately, with no restart. They're saved on the server in `settings.json` (default `~/.config/webterm/settings.json`, or `--config`), readable only by you, and shared by every browser. The token is never sent back to the browser. To turn notifications off, clear the topic URL and save.
 
 Programs trigger a notification with one of the standard escape sequences:
 
@@ -190,28 +191,41 @@ Files are read and written with the permissions of the user running webterm, the
 
 ## Credentials
 
-The server will not start without credentials. They are read from (first match wins):
+The login is read from (first match wins):
 
-1. **Environment variables:** `WEBTERM_USER` and `WEBTERM_PASSWORD_HASH`
-2. **Config file:** `{ "username": "...", "passwordHash": "..." }` at `~/.config/webterm/config.json` (or `--config` / `WEBTERM_CONFIG`). See `config.example.json`.
+1. **Environment variables:** `WEBTERM_USER` and `WEBTERM_PASSWORD_HASH` (for example from a `.env` file)
+2. **`settings.json`:** the `auth` section, in `~/.config/webterm/settings.json` (or the file given by `--config` / `WEBTERM_CONFIG`). This is where the setup page and `set-password` save it.
 
-Password hashes are scrypt, in the form `scrypt$<salt>$<hash>`:
+**First run:** with no login anywhere, webterm starts in setup mode and prints a one-time link:
+
+```
+No login is set up yet. Create one with this one-time link:
+  http://127.0.0.1:2828/setup#t=kJeuHlOXAHsScTHglDhmQ-mxhc0GXnhI
+```
+
+Open it to choose a username and password (at least 8 characters). webterm saves the login in `settings.json` and signs you in; no restart is needed.
+
+- **Only the link works:** until then, nothing else is reachable. The page needs the link's secret code, so someone else who finds the server first can't claim it.
+- **Wrong codes count as failed logins** toward the lockout.
+- **The code stays out of logs:** it's in the part of the URL after `#`, which browsers never send to the server.
+- **As a service:** the link is in its log, at `journalctl --user -u webterm`. If you open the setup page without it, you can paste the code instead.
+
+You can also set the login from the command line. Password hashes are scrypt, in the form `scrypt$<salt>$<hash>`:
 
 ```sh
-webterm set-password alice            # prompt, then write the config file (mode 600)
+webterm set-password alice            # prompt, then save to settings.json (mode 600)
 webterm set-password alice --print    # prompt, then print WEBTERM_USER / WEBTERM_PASSWORD_HASH lines
 echo 'secret pw' | webterm set-password alice   # non-interactive
 ```
 
-Restart the server after changing credentials. Sessions are held in memory, so a restart logs everyone out; otherwise they last 1 day. After 5 failed logins, an IP address is locked out for 15 minutes.
+Restart the server after changing the login with `set-password`. Sessions are held in memory, so a restart logs everyone out; otherwise they last 1 day. After 5 failed logins, an IP address is locked out for 15 minutes.
 
 ## Development
 
 ```sh
 git clone https://github.com/quincyyhuang/webterm.git && cd webterm
 npm install
-npm run set-password -- alice
-npm start
+npm start   # prints a setup link the first time
 ```
 
 ## Security notes

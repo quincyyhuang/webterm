@@ -7,6 +7,9 @@ import { initNotifySettings } from '/notify-settings.js';
 import { activeTheme, applyPageTheme, onSystemChange } from '/theme.js';
 import { initThemePicker } from '/theme-picker.js';
 
+// A used setup link (#t=...) redirects here and keeps its fragment; drop it from the address bar.
+if (location.hash.startsWith('#t=')) history.replaceState(null, '', location.pathname + location.search);
+
 const statusEl = document.getElementById('status');
 const titleEl = document.getElementById('title');
 const termEl = document.getElementById('terminal');

@@ -124,6 +124,8 @@
       <button type="submit">Sign in</button>
     </form>
     <script>
+      // A used setup link (#t=...) redirects here and keeps its fragment; drop it from the address bar.
+      if (location.hash.startsWith('#t=')) history.replaceState(null, '', location.pathname + location.search);
       const messages = {
         invalid: 'Incorrect username or password.',
         locked: 'Too many failed attempts. Try again in 15 minutes.',

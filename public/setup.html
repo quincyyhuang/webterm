@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#20232a" />
+    <script>
+      // Apply the saved color theme before first paint (no flash of the default colors).
+      // Written by /theme.js; see saveChoice() there.
+      try {
+        const t = JSON.parse(localStorage.getItem('webterm.themeVars') || 'null');
+        const v = t && (t.fixed || (matchMedia('(prefers-color-scheme: dark)').matches ? t.dark : t.light));
+        if (v) {
+          for (const k in v) document.documentElement.style.setProperty(k, v[k]);
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', v['--panel']);
+        }
+      } catch {}
+    </script>
+    <title>webterm — set up</title>
+    <style>
+      :root {
+        /* Page colors. These defaults match the default theme (Ghostty's colors); /theme.js
+           overrides them for the chosen theme, and the inline <head> script applies the saved
+           ones before paint. */
+        --bg: #282c34;
+        --panel: #20232a;
+        --surface: #44474e;
+        --surface-2: #575a61;
+        --text: #ffffff;
+        --subtext: #d4d5d6;
+        --muted: #9ea0a4;
+        --faint: #7e8085;
+        --accent: #81a2be;
+        --accent-hover: #6e8aa2;
+        --on-accent: #282c34;
+        --danger: #cc6666;
+        --success: #b5bd68;
+        --warning: #f0c674;
+        --pink: #b294bb;
+        --overlay: #16181dcc;
+        --shadow: #00000088;
+        color-scheme: dark;
+      }
+
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100dvh;
+        padding: 16px;
+        box-sizing: border-box;
+      }
+      form {
+        width: 100%;
+        max-width: 340px;
+        background: var(--panel);
+        border: 1px solid var(--surface);
+        border-radius: 12px;
+        padding: 28px 24px;
+        box-sizing: border-box;
+      }
+      h1 {
+        margin: 0 0 20px;
+        font: 600 20px ui-monospace, Menlo, Consolas, monospace;
+        color: var(--success);
+      }
+      h1::before { content: '> '; color: var(--faint); }
+      label {
+        display: block;
+        margin: 14px 0 6px;
+        font-size: 13px;
+        color: var(--subtext);
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 12px;
+        font-size: 16px; /* >= 16px prevents iOS zoom-on-focus */
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--surface-2);
+        border-radius: 8px;
+        outline: none;
+      }
+      input:focus { border-color: var(--accent); }
+      button {
+        width: 100%;
+        margin-top: 22px;
+        padding: 11px;
+        font: 600 15px system-ui, sans-serif;
+        color: var(--on-accent);
+        background: var(--accent);
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      button:active { background: var(--accent-hover); }
+      #error {
+        display: none;
+        margin: 0 0 4px;
+        padding: 8px 10px;
+        font-size: 13px;
+        color: var(--danger);
+        background: color-mix(in srgb, var(--danger) 13.33%, transparent);
+        border-radius: 6px;
+      }
+      .intro {
+        margin: -8px 0 6px;
+        font-size: 13px;
+        line-height: 1.45;
+        color: var(--subtext);
+      }
+      .hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+      code { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--subtext); }
+      #token-row { display: none; }
+      button:disabled { opacity: 0.6; cursor: default; }
+    </style>
+  </head>
+  <body>
+    <form id="setup" novalidate>
+      <h1>webterm</h1>
+      <p class="intro">No login is set up yet. Choose the username and password you'll use to sign in.</p>
+      <p id="error" role="alert"></p>
+      <div id="token-row">
+        <label for="token">Setup code</label>
+        <input id="token" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <p class="hint">Open the setup link printed in webterm's console (or <code>journalctl --user -u webterm</code>), or paste the code after <code>#t=</code>.</p>
+      </div>
+      <label for="username">Username</label>
+      <input id="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required autofocus />
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="new-password" minlength="8" required />
+      <p class="hint">At least 8 characters.</p>
+      <label for="confirm">Confirm password</label>
+      <input id="confirm" type="password" autocomplete="new-password" required />
+      <button type="submit">Create login</button>
+    </form>
+    <script>
+      // The one-time setup token arrives in the URL fragment (#t=...), which browsers never
+      // send to the server. Keep it for this tab, then drop it from the address bar.
+      const $ = (id) => document.getElementById(id);
+      const fromUrl = new URLSearchParams(location.hash.slice(1)).get('t');
+      if (fromUrl) {
+        sessionStorage.setItem('webterm.setupToken', fromUrl);
+        history.replaceState(null, '', location.pathname);
+      }
+      const token = () => $('token').value.trim() || sessionStorage.getItem('webterm.setupToken') || '';
+      if (!token()) $('token-row').style.display = 'block';
+
+      function showError(message) {
+        $('error').textContent = message;
+        $('error').style.display = message ? 'block' : 'none';
+      }
+
+      $('setup').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = $('username').value.trim();
+        const password = $('password').value;
+        if (!token()) return showError('Enter the setup code from webterm’s console or log.');
+        if (!username) return showError('Enter a username.');
+        if (password.length < 8) return showError('Password must be at least 8 characters.');
+        if (password !== $('confirm').value) return showError('The passwords don’t match.');
+        showError('');
+        const btn = $('setup').querySelector('button');
+        btn.disabled = true;
+        try {
+          const res = await fetch('/setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token(), username, password }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            sessionStorage.removeItem('webterm.setupToken');
+            location.href = '/';
+            return;
+          }
+          if (res.status === 409) {
+            location.href = '/login';
+            return;
+          }
+          if (res.status === 403) {
+            sessionStorage.removeItem('webterm.setupToken');
+            $('token-row').style.display = 'block';
+          }
+          showError(data.error || `Setup failed (HTTP ${res.status}).`);
+        } catch {
+          showError('Could not reach webterm. Is it still running?');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

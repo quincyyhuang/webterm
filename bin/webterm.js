@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,8 +22,9 @@ Options:
   -H, --host <addr>     address to bind      (env WEBTERM_HOST, default 127.0.0.1)
   -p, --port <port>     port to listen on    (env WEBTERM_PORT, default 2828)
   -s, --shell <path>    shell to run         (env WEBTERM_SHELL or SHELL)
-  -c, --config <path>   credentials file     (env WEBTERM_CONFIG,
-                                              default ~/.config/webterm/config.json)
+  -c, --config <path>   settings file: login and app settings
+                                              (env WEBTERM_CONFIG,
+                                              default ~/.config/webterm/settings.json)
       --max-upload <MB> per-file upload limit (env WEBTERM_MAX_UPLOAD_MB,
                                               default 1024; 0 = unlimited)
       --shell-timeout <hours>
@@ -35,12 +37,13 @@ Options:
   -h, --help            show this help
   -v, --version         show the version
 
-Credentials come from WEBTERM_USER + WEBTERM_PASSWORD_HASH if both are set,
-otherwise from the config file. A .env file in the current directory is
-loaded automatically.
+The login comes from WEBTERM_USER + WEBTERM_PASSWORD_HASH if both are set,
+otherwise from the settings file.
+If there is none, webterm prints a one-time link to a page where you create it.
+A .env file in the current directory is loaded automatically.
 
 Push notifications (ntfy) are configured in the app's settings menu and saved in
-settings.json next to the credentials file.
+the settings file too.
 
 install-service passes the server options you give it on to the service, and
 runs it in the current directory, so a .env file there is used too.
@@ -92,13 +95,13 @@ if (fs.existsSync('.env')) {
   }
 }
 
-function defaultConfigPath() {
+// settings.json: the login (setup page / set-password) and settings changed in the app
+// (e.g. push notifications).
+function defaultSettingsPath() {
   const base = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-  return path.join(base, 'webterm', 'config.json');
+  return path.join(base, 'webterm', 'settings.json');
 }
-const configPath = path.resolve(opts.config || process.env.WEBTERM_CONFIG || defaultConfigPath());
-// App settings changed from the browser (e.g. push notifications) live next to the credentials.
-const settingsPath = path.join(path.dirname(configPath), 'settings.json');
+const settingsPath = path.resolve(opts.config || process.env.WEBTERM_CONFIG || defaultSettingsPath());
 
 const [command, ...rest] = positionals;
 
@@ -107,7 +110,7 @@ if (command === 'set-password') {
   if (!username || rest.length > 1) fail('usage: webterm set-password <username> [--print]');
   const { setPassword } = await import('../lib/set-password.js');
   try {
-    await setPassword({ username, configPath, printOnly: Boolean(opts.print) });
+    await setPassword({ username, settingsPath, printOnly: Boolean(opts.print) });
   } catch (err) {
     fail(err.message);
   }
@@ -161,9 +164,15 @@ if (command === 'install-service') {
   const auth = await import('../lib/auth.js');
   let source;
   try {
-    source = auth.loadCredentials(configPath).source;
+    source = auth.loadCredentials({ settingsPath })?.source;
   } catch (err) {
     fail(err.message);
+  }
+  if (!source) {
+    console.log(
+      'note: no login is set up yet. Once the service starts, it prints a one-time setup link;\n' +
+        `      find it below, or later with: journalctl --user -u ${opts.name || 'webterm'} | grep setup\n`,
+    );
   }
   if (source === 'environment' && !fs.existsSync('.env')) {
     console.warn(
@@ -176,7 +185,7 @@ if (command === 'install-service') {
   const serverArgs = ['--shell', shell];
   if (opts.host) serverArgs.push('--host', opts.host);
   if (opts.port) serverArgs.push('--port', String(port));
-  if (opts.config) serverArgs.push('--config', configPath);
+  if (opts.config) serverArgs.push('--config', settingsPath);
   if (opts['max-upload'] !== undefined) serverArgs.push('--max-upload', opts['max-upload']);
   if (opts['shell-timeout'] !== undefined) serverArgs.push('--shell-timeout', opts['shell-timeout']);
 
@@ -214,19 +223,28 @@ try {
 
 let credentials;
 try {
-  credentials = auth.loadCredentials(configPath);
+  credentials = auth.loadCredentials({ settingsPath });
 } catch (err) {
   fail(err.message);
 }
+// No login yet: start in setup mode, reachable only through a one-time link (see lib/server.js).
+const setupToken = credentials ? undefined : crypto.randomBytes(24).toString('base64url');
 
 try {
-  await startServer({ host, port, shell, credentials, maxUploadBytes, detachedTimeoutMs, settingsPath });
+  await startServer({ host, port, shell, credentials, maxUploadBytes, detachedTimeoutMs, settingsPath, setupToken });
 } catch (err) {
   fail(`could not listen on ${host}:${port}: ${err.message}`);
 }
 
-console.log(`webterm ${version} running at http://${host.includes(':') ? `[${host}]` : host}:${port}  (shell: ${shell})`);
-console.log(`auth: user "${credentials.username}" from ${credentials.source}`);
+const shownHost = ['0.0.0.0', '::'].includes(host) ? 'localhost' : host.includes(':') ? `[${host}]` : host;
+console.log(`webterm ${version} running at http://${shownHost}:${port}  (shell: ${shell})`);
+if (credentials) {
+  console.log(`auth: user "${credentials.username}" from ${credentials.source}`);
+} else {
+  console.log('No login is set up yet. Create one with this one-time link:');
+  console.log(`  http://${shownHost}:${port}/setup#t=${setupToken}`);
+  if (shownHost !== host) console.log("  (or use this machine's address instead of localhost)");
+}
 if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
   console.warn('note: listening beyond localhost; traffic is plain HTTP. See the README security notes.');
 }
