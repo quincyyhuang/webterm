@@ -39,6 +39,9 @@ Credentials come from WEBTERM_USER + WEBTERM_PASSWORD_HASH if both are set,
 otherwise from the config file. A .env file in the current directory is
 loaded automatically.
 
+Push notifications (ntfy) are configured in the app's settings menu and saved in
+settings.json next to the credentials file.
+
 install-service passes the server options you give it on to the service, and
 runs it in the current directory, so a .env file there is used too.
 `;
@@ -94,6 +97,8 @@ function defaultConfigPath() {
   return path.join(base, 'webterm', 'config.json');
 }
 const configPath = path.resolve(opts.config || process.env.WEBTERM_CONFIG || defaultConfigPath());
+// App settings changed from the browser (e.g. push notifications) live next to the credentials.
+const settingsPath = path.join(path.dirname(configPath), 'settings.json');
 
 const [command, ...rest] = positionals;
 
@@ -120,8 +125,10 @@ if (command === 'uninstall-service') {
   process.exit(0);
 }
 
-if (command && command !== 'install-service') fail(`unknown command "${command}". Run "webterm --help" for usage.`);
-if (command === 'install-service' && rest.length) fail('usage: webterm install-service [options]');
+if (command && command !== 'install-service') {
+  fail(`unknown command "${command}". Run "webterm --help" for usage.`);
+}
+if (rest.length) fail(`usage: webterm ${command} [options]`);
 if (opts.print) fail('--print only applies to "webterm set-password"');
 if (!command && (opts.name || opts['dry-run'])) fail('--name and --dry-run only apply to install-service (and --name to uninstall-service)');
 
@@ -204,7 +211,7 @@ try {
 }
 
 try {
-  await startServer({ host, port, shell, credentials, maxUploadBytes, detachedTimeoutMs });
+  await startServer({ host, port, shell, credentials, maxUploadBytes, detachedTimeoutMs, settingsPath });
 } catch (err) {
   fail(`could not listen on ${host}:${port}: ${err.message}`);
 }

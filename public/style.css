@@ -85,10 +85,35 @@ button {
 #status.disconnected { background: #f38ba833; color: #f38ba8; cursor: pointer; }
 
 #terminal {
+  position: relative; /* for the bell flash overlay */
   flex: 1;
   min-height: 0;
   padding: 6px 0 0 8px;
   touch-action: none; /* swipe scrolling is handled in app.js */
+}
+
+/* Terminal bell: a brief light wash over the terminal. */
+#terminal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: #cdd6f4;
+  opacity: 0;
+  pointer-events: none;
+}
+#terminal.bell::after { animation: bell-flash 200ms ease-out; }
+@keyframes bell-flash {
+  from { opacity: 0.15; }
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* No flashing; a short outline instead. */
+  #terminal.bell::after { animation: bell-outline 400ms steps(1); background: none; opacity: 1; }
+}
+@keyframes bell-outline {
+  from { box-shadow: inset 0 0 0 2px #f9e2af; }
+  to { box-shadow: none; }
 }
 
 /* Font size >= 16px stops iOS Safari from zooming when the hidden input is focused. */
@@ -166,6 +191,54 @@ button {
 .font-controls { display: flex; align-items: center; gap: 8px; }
 .font-controls .hdr-btn { padding: 4px 10px; font-size: 13px; }
 #font-size { min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+.popover { max-height: calc(100% - 60px); overflow-y: auto; }
+
+/* Push notification settings */
+.setting-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 14px 12px;
+  border-top: 1px solid #313244;
+}
+.setting-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
+.setting-section small { color: #6c7086; font-size: 12px; line-height: 1.4; }
+.setting-section a { color: #89b4fa; }
+.setting-section code { font-family: ui-monospace, Menlo, Consolas, monospace; color: #a6adc8; }
+.badge { padding: 1px 8px; border-radius: 10px; background: #313244; color: #a6adc8; font-size: 11px; font-weight: 600; }
+.badge.on { background: #a6e3a133; color: #a6e3a1; }
+.field { margin-top: 4px; font-size: 13px; color: #a6adc8; }
+.field .opt { color: #6c7086; }
+.field-row { display: flex; gap: 6px; }
+.field-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 16px; /* >= 16px: no iOS zoom on focus */
+  color: #cdd6f4;
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  outline: none;
+}
+@media (pointer: fine) { .field-row input { font-size: 13px; } }
+.field-row input:focus { border-color: #89b4fa; }
+.field-row .hdr-btn { flex: none; }
+.inline-check { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; cursor: pointer; }
+.inline-check input { accent-color: #89b4fa; }
+.field-row.actions { margin-top: 6px; }
+.primary-sm {
+  padding: 5px 14px;
+  border-radius: 6px;
+  background: #89b4fa;
+  color: #1e1e2e;
+  font-weight: 600;
+  font-size: 13px;
+}
+.primary-sm:disabled, .setting-section .hdr-btn:disabled { opacity: 0.5; cursor: default; }
+#notify-status.ok { color: #a6e3a1; }
+#notify-status.error { color: #f38ba8; }
 
 /* ---------------------------------------------------------------------------
    Files panel

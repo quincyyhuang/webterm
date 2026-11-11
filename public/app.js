@@ -2,6 +2,8 @@ import { Terminal } from '/xterm.js';
 import { FitAddon } from '/addon-fit.js';
 import { WebLinksAddon } from '/addon-web-links.js';
 import { initFiles } from '/files.js';
+import { initBell } from '/bell.js';
+import { initNotifySettings } from '/notify-settings.js';
 
 const statusEl = document.getElementById('status');
 const titleEl = document.getElementById('title');
@@ -93,9 +95,24 @@ fontSizeEl.textContent = String(fontSize);
 document.getElementById('font-down').addEventListener('click', () => setFontSize(fontSize - 1));
 document.getElementById('font-up').addEventListener('click', () => setFontSize(fontSize + 1));
 
+// Title set by the shell/program, plus a bell marker while a bell rang in a tab you're not viewing.
+let baseTitle = 'webterm';
+let bellMarker = false;
+function renderTitle() {
+  titleEl.textContent = baseTitle;
+  document.title = (bellMarker ? '🔔 ' : '') + baseTitle;
+}
 term.onTitleChange((title) => {
-  titleEl.textContent = title || 'webterm';
-  document.title = title || 'webterm';
+  baseTitle = title || 'webterm';
+  renderTitle();
+});
+initBell({
+  term,
+  termEl,
+  setMarker(on) {
+    bellMarker = on;
+    renderTitle();
+  },
 });
 
 // ---------------------------------------------------------------------------
@@ -142,6 +159,7 @@ function connect() {
       shellId = msg.id;
       statusEl.title = msg.shared ? 'Shared shell: the same in every tab' : 'This tab has its own shell';
       term.reset(); // a running shell's screen is re-sent in full right after this
+      reportWatching();
       if (msg.restored) {
         setStatus('connected', 'resumed');
         setTimeout(() => ws === socket && socket.readyState === WebSocket.OPEN && setStatus('connected', 'connected'), 3000);
@@ -174,6 +192,13 @@ function connect() {
 // With a shared shell open in several tabs, the shell's size follows the tab in use.
 term.textarea?.addEventListener('focus', () => send({ type: 'focus' }));
 window.addEventListener('focus', () => send({ type: 'focus' }));
+
+// Tell the server whether you're looking at this tab, so it only sends push notifications
+// (if configured) when you aren't.
+const reportWatching = () => send({ type: 'watching', value: !document.hidden && document.hasFocus() });
+document.addEventListener('visibilitychange', reportWatching);
+window.addEventListener('focus', reportWatching);
+window.addEventListener('blur', reportWatching);
 
 function reconnect() {
   connect();
@@ -396,6 +421,7 @@ termEl.addEventListener('touchend', () => {
 // Settings popover
 // ---------------------------------------------------------------------------
 function initSettings({ getShellMode, setShellMode, onClose }) {
+  const notifySettings = initNotifySettings();
   const btn = document.getElementById('settings-btn');
   const pop = document.getElementById('settings');
   const perTab = document.getElementById('shell-per-tab');
@@ -412,6 +438,7 @@ function initSettings({ getShellMode, setShellMode, onClose }) {
 
   function open() {
     sync();
+    notifySettings.load();
     pop.hidden = false;
     btn.setAttribute('aria-expanded', 'true');
   }

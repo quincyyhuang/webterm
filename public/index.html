@@ -43,6 +43,38 @@
           <small id="shell-mode-note" class="note" hidden>Takes effect in tabs opened from now on.</small>
         </span>
       </label>
+      <label class="setting-row check">
+        <input type="checkbox" id="bell-sound" />
+        <span>
+          Bell sound
+          <small>Beep when a program rings the terminal bell. The terminal always flashes, and the tab title
+            shows a bell icon if you're looking elsewhere.</small>
+        </span>
+      </label>
+      <form id="notify-form" class="setting-section" autocomplete="off">
+        <div class="setting-head">Push notifications <span id="notify-state" class="badge">off</span></div>
+        <small>
+          Sent through <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy</a> when a program asks for one
+          (<code>printf '\e]9;done\a'</code>) and no tab is showing that shell. Saved on the server, for all browsers.
+        </small>
+        <label class="field" for="notify-url">Topic URL</label>
+        <span class="field-row">
+          <input id="notify-url" type="url" inputmode="url" placeholder="https://ntfy.sh/your-random-topic" spellcheck="false" />
+          <button id="notify-generate" type="button" class="hdr-btn" title="Generate a random ntfy.sh topic">New</button>
+        </span>
+        <small>Anyone who knows the topic name can read it; keep it long and random.</small>
+        <label class="field" for="notify-token">Access token <span class="opt">(optional)</span></label>
+        <span class="field-row">
+          <input id="notify-token" type="password" placeholder="none" />
+          <button id="notify-token-clear" type="button" class="hdr-btn" hidden>Remove</button>
+        </span>
+        <label class="inline-check"><input type="checkbox" id="notify-bell" /> Also notify on the terminal bell</label>
+        <span class="field-row actions">
+          <button id="notify-save" type="submit" class="primary-sm">Save</button>
+          <button id="notify-test" type="button" class="hdr-btn">Send test</button>
+        </span>
+        <small id="notify-status" role="status"></small>
+      </form>
     </div>
     <main id="terminal"></main>
     <nav id="keys" aria-label="Extra keys">

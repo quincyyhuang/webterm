@@ -100,6 +100,37 @@ There are two modes, chosen with **New shell for each tab** in the ⚙ settings 
 
 Type `exit` to end a shell. For the shared shell, that ends it in every tab, and pressing Enter starts a new one. A shared shell with no tabs open is ended after 7 days; change this with `--shell-timeout`. Restarting the server ends all shells.
 
+## Terminal bell
+
+When a program rings the bell (`printf '\a'`, or a tool that beeps when it's done), the terminal briefly flashes. With reduced motion turned on, it shows an outline instead. If you're looking at another tab or window, the page title gets a 🔔 until you come back, so you can spot which tab wants attention. Turn on **Bell sound** in the ⚙ settings menu for a short beep too. It's off by default, and with the shared shell only one tab beeps. This works over plain HTTP: it doesn't use browser notifications, which require HTTPS.
+
+## Push notifications (ntfy)
+
+webterm can send push notifications to your phone or desktop through [ntfy](https://ntfy.sh), using the ntfy apps or any ntfy subscriber. The **server** sends them, so they work over plain HTTP and even when no browser tab is open. That's handy with the shared shell: start a long job, close the laptop, and get a ping when it's done.
+
+Set it up in the app: open the ⚙ settings menu, go to **Push notifications**, and:
+
+1. Click **New** to generate a random ntfy.sh topic, or enter your own topic URL (for example from a self-hosted server). On ntfy.sh, anyone who knows the topic name can read it, so treat it like a password.
+2. Subscribe to that topic in the ntfy app on your phone or desktop.
+3. Optionally, add an access token for a protected topic, and turn on **Also notify on the terminal bell**.
+4. Click **Save**, then **Send test**.
+
+The settings apply immediately, with no restart. They're saved on the server in `settings.json`, next to the credentials file (default `~/.config/webterm/settings.json`), readable only by you, and shared by every browser. The token is never sent back to the browser. To turn notifications off, clear the topic URL and save.
+
+Programs trigger a notification with one of the standard escape sequences:
+
+```sh
+printf '\e]9;build finished\a'                  # OSC 9 (iTerm2 style)
+printf '\e]777;notify;Deploy;all green\a'       # OSC 777 (title + body)
+make && printf '\e]9;make ok\a' || printf '\e]9;make FAILED\a'
+```
+
+Kitty's OSC 99 also works, and some tools emit these sequences on their own. Plain bells (`\a`) only trigger a push if **Also notify on the terminal bell** is on, since shells beep on every failed completion.
+
+- **When it pushes:** only when nobody is looking at that shell (no tab visible and focused). At most one push goes out every 5 seconds; extra ones are counted into the next.
+- **What's sent:** the notification text and the terminal's title, never terminal output. Tapping the notification opens webterm.
+- **Self-hosting:** a [self-hosted ntfy server](https://docs.ntfy.sh/install/) keeps everything on your network; enter its topic URL instead. Notifications to iOS from a self-hosted server need extra setup; see the ntfy docs.
+
 ## Files
 
 The folder button in the header opens a file browser that starts in your terminal's current directory.
