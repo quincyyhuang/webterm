@@ -110,6 +110,17 @@ Pick a theme in the ⚙ settings menu under **Theme**. It offers the 900+ scheme
 - **Saved per browser,** like text size. The page applies it before it first draws, so there's no flash of the default colors.
 - **Bundled:** the schemes ship in `public/themes.json`, so webterm never contacts GitHub. To refresh them from upstream, run `npm run update-themes`.
 
+## Cursor
+
+Choose the cursor in the ⚙ settings menu (saved per browser):
+
+- **Block** (default): a solid rectangle over the character.
+- **Bar:** a thin line between characters.
+- **Underline:** a line under the character.
+- **Hollow:** an outlined rectangle.
+
+Programs can still change the cursor while they run; vim's insert-mode bar, for example. With **Hollow** selected, a program that asks for a block cursor gets the hollow one.
+
 ## Copy and paste
 
 Select text with the mouse, then:

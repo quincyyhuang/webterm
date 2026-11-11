@@ -19,6 +19,7 @@
   --pink: #b294bb;
   --overlay: #16181dcc;
   --shadow: #00000088;
+  --cursor: #ffffff;
   color-scheme: dark;
 }
 
@@ -114,6 +115,23 @@ button {
   min-height: 0;
   padding: 6px 0 0 8px;
   touch-action: none; /* swipe scrolling is handled in app.js */
+}
+
+/* Hollow block cursor: xterm.js only outlines the cursor when the terminal is unfocused, so
+   restyle its (focused) block cursor as an outline. The id selector outranks xterm.js's own
+   !important rule. Programs that switch to a bar/underline cursor (e.g. vim insert mode) are
+   unaffected, since those use different classes. */
+#terminal.cursor-hollow .xterm-rows .xterm-cursor.xterm-cursor-block {
+  background-color: transparent !important;
+  color: inherit !important;
+  outline: 1px solid var(--cursor, var(--text));
+  outline-offset: -1px;
+}
+#terminal.cursor-hollow .xterm-rows .xterm-cursor.xterm-cursor-block.xterm-cursor-blink {
+  animation: cursor-hollow-blink 1s step-end infinite;
+}
+@keyframes cursor-hollow-blink {
+  50% { outline-color: transparent; }
 }
 
 /* Terminal bell: a brief light wash over the terminal. */
@@ -572,3 +590,5 @@ body.dragging #drop-overlay { display: flex; }
 .theme-row.selected .check { visibility: visible; }
 .theme-row.selected .tname { font-weight: 600; }
 .panel .hint a { color: var(--accent); }
+
+#cursor-style button { height: 28px; padding: 0 8px; font-size: 12px; }

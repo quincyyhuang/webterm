@@ -101,6 +101,7 @@ export function deriveVars(theme) {
     '--pink': readable(bg, [c.magenta, c.brightMagenta, fg]),
     '--overlay': mix(bg, '#000000', dark ? 0.45 : 0.3) + 'cc',
     '--shadow': dark ? '#00000088' : '#00000033',
+    '--cursor': c.cursor || fg,
     // Not a custom property: native controls (checkboxes, scrollbars) match the theme.
     'color-scheme': dark ? 'dark' : 'light',
   };

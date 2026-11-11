@@ -74,6 +74,31 @@ function setFontSize(size) {
   fontSizeEl.textContent = String(fontSize);
   fit.fit();
 }
+// Cursor style (per browser): block (default, like Ghostty), bar, underline, or block_hollow.
+// xterm.js only draws a hollow block for an unfocused terminal, so "block_hollow" keeps its
+// block cursor and restyles it as an outline in CSS (#terminal.cursor-hollow).
+const CURSOR_KEY = 'webterm.cursorStyle';
+const CURSOR_STYLES = ['block', 'bar', 'underline', 'block_hollow'];
+function setCursorStyle(style) {
+  if (!CURSOR_STYLES.includes(style)) style = 'block';
+  localStorage.setItem(CURSOR_KEY, style);
+  term.options.cursorStyle = style === 'block_hollow' ? 'block' : style;
+  termEl.classList.toggle('cursor-hollow', style === 'block_hollow');
+  for (const b of document.querySelectorAll('#cursor-style button')) {
+    const on = b.dataset.cursor === style;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  }
+}
+setCursorStyle(localStorage.getItem(CURSOR_KEY) || 'block');
+document.getElementById('cursor-style').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-cursor]');
+  if (b) setCursorStyle(b.dataset.cursor);
+});
+window.addEventListener('storage', (e) => {
+  if (e.key === CURSOR_KEY) setCursorStyle(e.newValue); // changed in another tab
+});
+
 const fontSizeEl = document.getElementById('font-size');
 fontSizeEl.textContent = String(fontSize);
 document.getElementById('font-down').addEventListener('click', () => setFontSize(fontSize - 1));
